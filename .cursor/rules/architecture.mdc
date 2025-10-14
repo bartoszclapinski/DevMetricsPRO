@@ -1,0 +1,564 @@
+---
+alwaysApply: false
+---
+
+# Clean Architecture Rules for DevMetrics Pro
+
+## Architecture Overview
+
+DevMetrics Pro follows Clean Architecture principles with these layers:
+
+```
+┌─────────────────────────────────────┐
+│         DevMetricsPro.Web           │  Presentation (Blazor Server)
+│         (UI Layer)                  │
+├─────────────────────────────────────┤
+│    DevMetricsPro.Infrastructure     │  External concerns
+│    (Data, External APIs)            │
+├─────────────────────────────────────┤
+│    DevMetricsPro.Application        │  Business logic orchestration
+│    (Use Cases, DTOs)                │
+├─────────────────────────────────────┤
+│       DevMetricsPro.Core            │  Domain entities & interfaces
+│       (Domain Layer)                │
+└─────────────────────────────────────┘
+```
+
+## Dependency Rules
+
+### CRITICAL: Dependency Direction
+- Dependencies ALWAYS point inward (toward Core)
+- Core has NO dependencies on other projects
+- Application depends ONLY on Core
+- Infrastructure depends on Core and Application
+- Web depends on Application and Infrastructure
+
+### Examples:
+✅ CORRECT:
+```csharp
+// In Application layer
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Interfaces;
+
+// In Infrastructure layer
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Application.Interfaces;
+```
+
+❌ INCORRECT:
+```csharp
+// In Core layer - NEVER reference other layers!
+using DevMetricsPro.Infrastructure.Data;  // ❌ NO!
+using DevMetricsPro.Application.DTOs;     // ❌ NO!
+```
+
+## Layer Responsibilities
+
+### Core Layer (DevMetricsPro.Core)
+**Purpose**: Domain entities, value objects, enums, domain interfaces
+
+**Contains**:
+- `Entities/` - Domain entities (Developer, Repository, Commit, etc.)
+- `Enums/` - Domain enumerations
+- `Exceptions/` - Domain-specific exceptions
+- `Interfaces/` - Repository interfaces, domain service interfaces
+- `ValueObjects/` - Value objects (if needed)
+
+**Rules**:
+- NO external dependencies (except .NET BCL)
+- NO Entity Framework attributes
+- NO business logic - pure domain models
+- All entities inherit from BaseEntity
+- Use domain-driven design principles
+
+**Example Entity**:
+```csharp
+namespace DevMetricsPro.Core.Entities;
+
+public class Developer : BaseEntity
+{
+    public string Email { get; set; } = string.Empty;
+    public string? GitHubUsername { get; set; }
+    
+    // Navigation properties
+    public ICollection<Commit> Commits { get; set; } = new List<Commit>();
+}
+```
+
+### Application Layer (DevMetricsPro.Application)
+**Purpose**: Business logic, use cases, DTOs, application services
+
+**Contains**:
+- `DTOs/` - Data Transfer Objects for API requests/responses
+- `Interfaces/` - Application service interfaces
+- `Services/` - Application services (business logic)
+- `Mappings/` - AutoMapper profiles
+- `Validators/` - FluentValidation validators
+
+**Rules**:
+- Depends ONLY on Core
+- Contains business logic orchestration
+- Defines interfaces for external services (implemented in Infrastructure)
+- Uses DTOs for data transfer (never expose domain entities directly)
+
+**Example Service Interface**:
+```csharp
+namespace DevMetricsPro.Application.Interfaces;
+
+public interface IDeveloperService
+{
+    Task<DeveloperDto> GetDeveloperAsync(Guid id, CancellationToken cancellationToken);
+    Task<DeveloperDto> CreateDeveloperAsync(CreateDeveloperRequest request, CancellationToken cancellationToken);
+}
+```
+
+### Infrastructure Layer (DevMetricsPro.Infrastructure)
+**Purpose**: Data access, external API integrations, technical implementations
+
+**Contains**:
+- `Data/` - DbContext, migrations, configurations
+- `Repositories/` - Repository implementations
+- `Services/` - External service implementations (GitHub API, email, etc.)
+- `Integrations/` - Third-party integrations
+
+**Rules**:
+- Implements interfaces defined in Core and Application
+- Contains Entity Framework configurations
+- Handles all external I/O (database, APIs, file system)
+- NO business logic - only technical implementations
+
+**Example Repository**:
+```csharp
+namespace DevMetricsPro.Infrastructure.Repositories;
+
+public class DeveloperRepository : Repository<Developer>, IDeveloperRepository
+{
+    public DeveloperRepository(ApplicationDbContext context) : base(context) { }
+    
+    // Add specific developer queries here
+}
+```
+
+### Web Layer (DevMetricsPro.Web)
+**Purpose**: Blazor Server UI, API endpoints, presentation logic
+
+**Contains**:
+- `Components/` - Blazor components
+- `Controllers/` - API controllers
+- `Hubs/` - SignalR hubs
+- `Extensions/` - Service registration extensions
+
+**Rules**:
+- Depends on Application and Infrastructure
+- Handles HTTP requests/responses
+- Blazor components for UI
+- NO business logic (delegate to Application services)
+- Configure DI container here
+
+## File Organization Rules
+
+### Naming Conventions:
+- Entities: PascalCase, singular (e.g., `Developer.cs`, not `Developers.cs`)
+- Interfaces: Start with `I` (e.g., `IDeveloperService.cs`)
+- DTOs: End with `Dto`, `Request`, or `Response` (e.g., `DeveloperDto.cs`, `CreateDeveloperRequest.cs`)
+- Services: End with `Service` (e.g., `DeveloperService.cs`)
+- Repositories: End with `Repository` (e.g., `DeveloperRepository.cs`)
+
+### Folder Structure Rules:
+- Group by feature/entity when it makes sense
+- Keep related files together
+- Maximum 10 files per folder (create subfolders if needed)
+
+## Testing Rules
+
+### Test Project Organization:
+```
+DevMetricsPro.Core.Tests/
+├── Entities/           # Entity tests
+└── ValueObjects/       # Value object tests
+
+DevMetricsPro.Application.Tests/
+├── Services/          # Service tests
+└── Validators/        # Validator tests
+
+DevMetricsPro.Integration.Tests/
+├── Repositories/      # Repository integration tests
+└── Api/              # API integration tests
+```
+
+### Test Naming:
+```csharp
+public class DeveloperServiceTests
+{
+    [Fact]
+    public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+    {
+        // Arrange
+        // Act
+        // Assert
+    }
+}
+```
+
+## Dependency Injection
+
+### Service Registration Pattern:
+Register services in `Program.cs` using extension methods:
+
+```csharp
+// In Infrastructure/Extensions/ServiceCollectionExtensions.cs
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Register infrastructure services
+        services.AddDbContext<ApplicationDbContext>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        return services;
+    }
+}
+
+// In Program.cs
+builder.Services.AddInfrastructure(builder.Configuration);
+```
+
+## When Creating New Features
+
+1. **Start with Core**: Define entities and interfaces
+2. **Move to Application**: Create DTOs and service interfaces
+3. **Implement in Infrastructure**: Create repositories and services
+4. **Add to Web**: Create Blazor components or API endpoints
+5. **Write tests**: Unit tests for Application, integration tests for Infrastructure
+
+## Common Patterns
+
+### Repository Pattern:
+```csharp
+// In Core/Interfaces/IRepository.cs
+public interface IRepository<T> where T : class
+{
+    Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### Unit of Work Pattern:
+```csharp
+// In Core/Interfaces/IUnitOfWork.cs
+public interface IUnitOfWork : IDisposable
+{
+    IRepository<T> Repository<T>() where T : class;
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+## Anti-Patterns to Avoid
+
+❌ **DON'T** put business logic in controllers or Blazor components
+❌ **DON'T** reference Infrastructure from Application
+❌ **DON'T** return entities directly from API - use DTOs
+❌ **DON'T** use `var` for interface types - be explicit
+❌ **DON'T** create circular dependencies between layers
+
+✅ **DO** keep layers independent
+✅ **DO** use dependency injection
+✅ **DO** write tests for business logic
+✅ **DO** use async/await for I/O operations
+✅ **DO** handle errors gracefully
+
+## Quick Reference: "Where does this go?"
+
+| What | Where | Example |
+|------|-------|---------|
+| Domain entity | Core/Entities | `Developer.cs` |
+| Repository interface | Core/Interfaces | `IDeveloperRepository.cs` |
+| DTO | Application/DTOs | `DeveloperDto.cs` |
+| Business logic | Application/Services | `DeveloperService.cs` |
+| Service interface | Application/Interfaces | `IDeveloperService.cs` |
+| EF configuration | Infrastructure/Data/Configurations | `DeveloperConfiguration.cs` |
+| Repository implementation | Infrastructure/Repositories | `DeveloperRepository.cs` |
+| External API client | Infrastructure/Services | `GitHubService.cs` |
+| Blazor component | Web/Components | `DeveloperCard.razor` |
+| API controller | Web/Controllers | `DevelopersController.cs` |
+# Clean Architecture Rules for DevMetrics Pro
+
+## Architecture Overview
+
+DevMetrics Pro follows Clean Architecture principles with these layers:
+
+```
+┌─────────────────────────────────────┐
+│         DevMetricsPro.Web           │  Presentation (Blazor Server)
+│         (UI Layer)                  │
+├─────────────────────────────────────┤
+│    DevMetricsPro.Infrastructure     │  External concerns
+│    (Data, External APIs)            │
+├─────────────────────────────────────┤
+│    DevMetricsPro.Application        │  Business logic orchestration
+│    (Use Cases, DTOs)                │
+├─────────────────────────────────────┤
+│       DevMetricsPro.Core            │  Domain entities & interfaces
+│       (Domain Layer)                │
+└─────────────────────────────────────┘
+```
+
+## Dependency Rules
+
+### CRITICAL: Dependency Direction
+- Dependencies ALWAYS point inward (toward Core)
+- Core has NO dependencies on other projects
+- Application depends ONLY on Core
+- Infrastructure depends on Core and Application
+- Web depends on Application and Infrastructure
+
+### Examples:
+✅ CORRECT:
+```csharp
+// In Application layer
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Interfaces;
+
+// In Infrastructure layer
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Application.Interfaces;
+```
+
+❌ INCORRECT:
+```csharp
+// In Core layer - NEVER reference other layers!
+using DevMetricsPro.Infrastructure.Data;  // ❌ NO!
+using DevMetricsPro.Application.DTOs;     // ❌ NO!
+```
+
+## Layer Responsibilities
+
+### Core Layer (DevMetricsPro.Core)
+**Purpose**: Domain entities, value objects, enums, domain interfaces
+
+**Contains**:
+- `Entities/` - Domain entities (Developer, Repository, Commit, etc.)
+- `Enums/` - Domain enumerations
+- `Exceptions/` - Domain-specific exceptions
+- `Interfaces/` - Repository interfaces, domain service interfaces
+- `ValueObjects/` - Value objects (if needed)
+
+**Rules**:
+- NO external dependencies (except .NET BCL)
+- NO Entity Framework attributes
+- NO business logic - pure domain models
+- All entities inherit from BaseEntity
+- Use domain-driven design principles
+
+**Example Entity**:
+```csharp
+namespace DevMetricsPro.Core.Entities;
+
+public class Developer : BaseEntity
+{
+    public string Email { get; set; } = string.Empty;
+    public string? GitHubUsername { get; set; }
+    
+    // Navigation properties
+    public ICollection<Commit> Commits { get; set; } = new List<Commit>();
+}
+```
+
+### Application Layer (DevMetricsPro.Application)
+**Purpose**: Business logic, use cases, DTOs, application services
+
+**Contains**:
+- `DTOs/` - Data Transfer Objects for API requests/responses
+- `Interfaces/` - Application service interfaces
+- `Services/` - Application services (business logic)
+- `Mappings/` - AutoMapper profiles
+- `Validators/` - FluentValidation validators
+
+**Rules**:
+- Depends ONLY on Core
+- Contains business logic orchestration
+- Defines interfaces for external services (implemented in Infrastructure)
+- Uses DTOs for data transfer (never expose domain entities directly)
+
+**Example Service Interface**:
+```csharp
+namespace DevMetricsPro.Application.Interfaces;
+
+public interface IDeveloperService
+{
+    Task<DeveloperDto> GetDeveloperAsync(Guid id, CancellationToken cancellationToken);
+    Task<DeveloperDto> CreateDeveloperAsync(CreateDeveloperRequest request, CancellationToken cancellationToken);
+}
+```
+
+### Infrastructure Layer (DevMetricsPro.Infrastructure)
+**Purpose**: Data access, external API integrations, technical implementations
+
+**Contains**:
+- `Data/` - DbContext, migrations, configurations
+- `Repositories/` - Repository implementations
+- `Services/` - External service implementations (GitHub API, email, etc.)
+- `Integrations/` - Third-party integrations
+
+**Rules**:
+- Implements interfaces defined in Core and Application
+- Contains Entity Framework configurations
+- Handles all external I/O (database, APIs, file system)
+- NO business logic - only technical implementations
+
+**Example Repository**:
+```csharp
+namespace DevMetricsPro.Infrastructure.Repositories;
+
+public class DeveloperRepository : Repository<Developer>, IDeveloperRepository
+{
+    public DeveloperRepository(ApplicationDbContext context) : base(context) { }
+    
+    // Add specific developer queries here
+}
+```
+
+### Web Layer (DevMetricsPro.Web)
+**Purpose**: Blazor Server UI, API endpoints, presentation logic
+
+**Contains**:
+- `Components/` - Blazor components
+- `Controllers/` - API controllers
+- `Hubs/` - SignalR hubs
+- `Extensions/` - Service registration extensions
+
+**Rules**:
+- Depends on Application and Infrastructure
+- Handles HTTP requests/responses
+- Blazor components for UI
+- NO business logic (delegate to Application services)
+- Configure DI container here
+
+## File Organization Rules
+
+### Naming Conventions:
+- Entities: PascalCase, singular (e.g., `Developer.cs`, not `Developers.cs`)
+- Interfaces: Start with `I` (e.g., `IDeveloperService.cs`)
+- DTOs: End with `Dto`, `Request`, or `Response` (e.g., `DeveloperDto.cs`, `CreateDeveloperRequest.cs`)
+- Services: End with `Service` (e.g., `DeveloperService.cs`)
+- Repositories: End with `Repository` (e.g., `DeveloperRepository.cs`)
+
+### Folder Structure Rules:
+- Group by feature/entity when it makes sense
+- Keep related files together
+- Maximum 10 files per folder (create subfolders if needed)
+
+## Testing Rules
+
+### Test Project Organization:
+```
+DevMetricsPro.Core.Tests/
+├── Entities/           # Entity tests
+└── ValueObjects/       # Value object tests
+
+DevMetricsPro.Application.Tests/
+├── Services/          # Service tests
+└── Validators/        # Validator tests
+
+DevMetricsPro.Integration.Tests/
+├── Repositories/      # Repository integration tests
+└── Api/              # API integration tests
+```
+
+### Test Naming:
+```csharp
+public class DeveloperServiceTests
+{
+    [Fact]
+    public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+    {
+        // Arrange
+        // Act
+        // Assert
+    }
+}
+```
+
+## Dependency Injection
+
+### Service Registration Pattern:
+Register services in `Program.cs` using extension methods:
+
+```csharp
+// In Infrastructure/Extensions/ServiceCollectionExtensions.cs
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Register infrastructure services
+        services.AddDbContext<ApplicationDbContext>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        return services;
+    }
+}
+
+// In Program.cs
+builder.Services.AddInfrastructure(builder.Configuration);
+```
+
+## When Creating New Features
+
+1. **Start with Core**: Define entities and interfaces
+2. **Move to Application**: Create DTOs and service interfaces
+3. **Implement in Infrastructure**: Create repositories and services
+4. **Add to Web**: Create Blazor components or API endpoints
+5. **Write tests**: Unit tests for Application, integration tests for Infrastructure
+
+## Common Patterns
+
+### Repository Pattern:
+```csharp
+// In Core/Interfaces/IRepository.cs
+public interface IRepository<T> where T : class
+{
+    Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### Unit of Work Pattern:
+```csharp
+// In Core/Interfaces/IUnitOfWork.cs
+public interface IUnitOfWork : IDisposable
+{
+    IRepository<T> Repository<T>() where T : class;
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+## Anti-Patterns to Avoid
+
+❌ **DON'T** put business logic in controllers or Blazor components
+❌ **DON'T** reference Infrastructure from Application
+❌ **DON'T** return entities directly from API - use DTOs
+❌ **DON'T** use `var` for interface types - be explicit
+❌ **DON'T** create circular dependencies between layers
+
+✅ **DO** keep layers independent
+✅ **DO** use dependency injection
+✅ **DO** write tests for business logic
+✅ **DO** use async/await for I/O operations
+✅ **DO** handle errors gracefully
+
+## Quick Reference: "Where does this go?"
+
+| What | Where | Example |
+|------|-------|---------|
+| Domain entity | Core/Entities | `Developer.cs` |
+| Repository interface | Core/Interfaces | `IDeveloperRepository.cs` |
+| DTO | Application/DTOs | `DeveloperDto.cs` |
+| Business logic | Application/Services | `DeveloperService.cs` |
+| Service interface | Application/Interfaces | `IDeveloperService.cs` |
+| EF configuration | Infrastructure/Data/Configurations | `DeveloperConfiguration.cs` |
+| Repository implementation | Infrastructure/Repositories | `DeveloperRepository.cs` |
+| External API client | Infrastructure/Services | `GitHubService.cs` |
+| Blazor component | Web/Components | `DeveloperCard.razor` |
+| API controller | Web/Controllers | `DevelopersController.cs` |

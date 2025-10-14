@@ -1,0 +1,850 @@
+---
+alwaysApply: false
+---
+
+# .NET 9 & C# Coding Conventions for DevMetrics Pro
+
+## General C# Conventions
+
+### Language Version
+- Use C# 12 features (latest with .NET 9)
+- Enable nullable reference types: `<Nullable>enable</Nullable>`
+- Use file-scoped namespaces (C# 10+)
+- Use implicit usings: `<ImplicitUsings>enable</ImplicitUsings>`
+
+### File-Scoped Namespaces
+✅ **USE THIS**:
+```csharp
+namespace DevMetricsPro.Core.Entities;
+
+public class Developer : BaseEntity
+{
+    // ...
+}
+```
+
+❌ **NOT THIS**:
+```csharp
+namespace DevMetricsPro.Core.Entities
+{
+    public class Developer : BaseEntity
+    {
+        // ...
+    }
+}
+```
+
+## Naming Conventions
+
+### Classes, Records, Structs
+- **PascalCase** for types
+- Descriptive, meaningful names
+- Avoid abbreviations
+
+```csharp
+public class Developer { }
+public record DeveloperDto(string Email, string DisplayName);
+public struct MetricValue { }
+```
+
+### Interfaces
+- Start with `I` followed by **PascalCase**
+
+```csharp
+public interface IDeveloperService { }
+public interface IRepository<T> where T : class { }
+```
+
+### Methods
+- **PascalCase** for method names
+- Async methods should end with `Async`
+- Use verbs for method names
+
+```csharp
+public async Task<Developer> GetDeveloperAsync(Guid id, CancellationToken cancellationToken)
+{
+    // ...
+}
+
+public void CalculateMetrics() { }
+```
+
+### Properties
+- **PascalCase** for properties
+- Use expression-bodied properties when appropriate
+
+```csharp
+public string DisplayName { get; set; }
+public string FullName => $"{FirstName} {LastName}";
+public bool IsActive { get; init; } = true;
+```
+
+### Fields
+- **_camelCase** for private fields (with underscore)
+- **PascalCase** for public fields (avoid public fields - use properties)
+
+```csharp
+private readonly ILogger<DeveloperService> _logger;
+private string _cachedValue;
+```
+
+### Parameters and Local Variables
+- **camelCase** for parameters and locals
+
+```csharp
+public void ProcessDeveloper(Developer developer, string displayName)
+{
+    var emailAddress = developer.Email;
+    var isValid = ValidateEmail(emailAddress);
+}
+```
+
+### Constants
+- **PascalCase** for constants
+
+```csharp
+private const int MaxRetryAttempts = 3;
+public const string ApiVersion = "v1";
+```
+
+## Modern C# Features to Use
+
+### Primary Constructors (C# 12)
+✅ For simple DTOs and records:
+```csharp
+public record DeveloperDto(Guid Id, string Email, string DisplayName);
+
+public class MetricCalculator(ILogger<MetricCalculator> logger)
+{
+    public void Calculate()
+    {
+        logger.LogInformation("Calculating metrics");
+    }
+}
+```
+
+### Collection Expressions (C# 12)
+✅ Use collection expressions:
+```csharp
+List<string> names = ["Alice", "Bob", "Charlie"];
+int[] numbers = [1, 2, 3, 4, 5];
+```
+
+### Required Members
+✅ Use `required` for must-set properties:
+```csharp
+public class CreateDeveloperRequest
+{
+    public required string Email { get; init; }
+    public string? DisplayName { get; init; }
+}
+```
+
+### Pattern Matching
+✅ Use pattern matching extensively:
+```csharp
+public string GetStatusMessage(PullRequestStatus status) => status switch
+{
+    PullRequestStatus.Open => "Open for review",
+    PullRequestStatus.Merged => "Successfully merged",
+    PullRequestStatus.Closed => "Closed without merge",
+    _ => throw new ArgumentException($"Unknown status: {status}")
+};
+```
+
+### Null-Conditional Operators
+✅ Use `?.` and `??` for null safety:
+```csharp
+var username = developer?.GitHubUsername ?? "Unknown";
+var commitCount = repository?.Commits?.Count ?? 0;
+```
+
+### String Interpolation
+✅ Use string interpolation over concatenation:
+```csharp
+var message = $"Developer {developer.Email} has {commitCount} commits";
+```
+
+## Async/Await Patterns
+
+### Always Use CancellationToken
+✅ **REQUIRED**: Pass CancellationToken to all async methods:
+```csharp
+public async Task<Developer> GetDeveloperAsync(
+    Guid id, 
+    CancellationToken cancellationToken = default)
+{
+    return await _context.Developers
+        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+}
+```
+
+### ConfigureAwait
+❌ **DON'T USE** `ConfigureAwait(false)` in ASP.NET Core projects:
+```csharp
+// NO: Not needed in ASP.NET Core
+await SomeMethodAsync().ConfigureAwait(false);
+
+// YES: Simple await
+await SomeMethodAsync();
+```
+
+### ValueTask for Hot Paths
+✅ Use `ValueTask<T>` for frequently called methods that often complete synchronously:
+```csharp
+public ValueTask<Developer?> GetCachedDeveloperAsync(Guid id)
+{
+    if (_cache.TryGetValue(id, out var developer))
+    {
+        return ValueTask.FromResult(developer);
+    }
+    
+    return new ValueTask<Developer?>(LoadDeveloperAsync(id));
+}
+```
+
+## LINQ Conventions
+
+### Prefer Method Syntax
+✅ Use method syntax (unless query syntax is clearer):
+```csharp
+var activeDevelopers = developers
+    .Where(d => d.IsActive)
+    .OrderBy(d => d.DisplayName)
+    .Take(10);
+```
+
+### Async LINQ with EF Core
+✅ Use EF Core async methods:
+```csharp
+var developers = await _context.Developers
+    .Where(d => d.Email.Contains("@example.com"))
+    .ToListAsync(cancellationToken);
+
+var count = await _context.Commits
+    .CountAsync(c => c.DeveloperId == id, cancellationToken);
+```
+
+## Dependency Injection
+
+### Constructor Injection
+✅ **ALWAYS** use constructor injection:
+```csharp
+public class DeveloperService
+{
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<DeveloperService> _logger;
+
+    public DeveloperService(
+        IUnitOfWork unitOfWork,
+        ILogger<DeveloperService> logger)
+    {
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+}
+```
+
+### Service Lifetimes
+- **Transient**: Created each time (use for lightweight, stateless services)
+- **Scoped**: Per HTTP request (use for DbContext, UnitOfWork)
+- **Singleton**: Once per application (use for caches, configuration)
+
+```csharp
+// In Program.cs
+builder.Services.AddTransient<IMetricCalculator, MetricCalculator>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
+```
+
+## Error Handling
+
+### Use Exceptions for Exceptional Cases
+✅ Throw meaningful exceptions:
+```csharp
+public class DeveloperService
+{
+    public async Task<Developer> GetDeveloperAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var developer = await _unitOfWork.Repository<Developer>()
+            .GetByIdAsync(id, cancellationToken);
+            
+        if (developer is null)
+        {
+            throw new NotFoundException($"Developer with ID {id} not found");
+        }
+        
+        return developer;
+    }
+}
+```
+
+### Custom Exceptions
+✅ Create domain-specific exceptions in Core:
+```csharp
+namespace DevMetricsPro.Core.Exceptions;
+
+public class NotFoundException : Exception
+{
+    public NotFoundException(string message) : base(message) { }
+}
+
+public class ValidationException : Exception
+{
+    public ValidationException(string message) : base(message) { }
+}
+```
+
+## Logging
+
+### Structured Logging
+✅ Use structured logging with ILogger:
+```csharp
+_logger.LogInformation(
+    "Processing developer {DeveloperId} with {CommitCount} commits",
+    developer.Id,
+    commitCount);
+
+_logger.LogError(
+    exception,
+    "Failed to sync repository {RepositoryId}",
+    repositoryId);
+```
+
+### Log Levels
+- **Trace**: Very detailed (development only)
+- **Debug**: Debugging information
+- **Information**: General flow
+- **Warning**: Unexpected but recoverable
+- **Error**: Errors and exceptions
+- **Critical**: Critical failures
+
+## Code Style
+
+### Braces
+✅ Always use braces, even for single-line statements:
+```csharp
+if (developer.IsActive)
+{
+    await ProcessDeveloperAsync(developer, cancellationToken);
+}
+```
+
+### Spacing
+✅ Consistent spacing:
+```csharp
+// Space after control keywords
+if (condition) { }
+for (int i = 0; i < count; i++) { }
+
+// No space for method calls
+SomeMethod(param1, param2);
+
+// Space around operators
+var result = value1 + value2;
+```
+
+### Line Length
+- Maximum 120 characters per line
+- Break long lines logically
+
+### Regions
+❌ **AVOID** regions - they hide code:
+```csharp
+// NO
+#region Private Methods
+private void Something() { }
+#endregion
+```
+
+## XML Documentation
+
+### Public APIs Must Have Documentation
+✅ Document all public APIs:
+```csharp
+/// <summary>
+/// Gets a developer by their unique identifier.
+/// </summary>
+/// <param name="id">The unique identifier of the developer.</param>
+/// <param name="cancellationToken">Cancellation token.</param>
+/// <returns>The developer if found, null otherwise.</returns>
+/// <exception cref="ArgumentException">Thrown when id is empty.</exception>
+public async Task<Developer?> GetDeveloperAsync(
+    Guid id, 
+    CancellationToken cancellationToken = default)
+{
+    // ...
+}
+```
+
+## Performance Best Practices
+
+### Avoid Allocations in Hot Paths
+✅ Use `Span<T>` and `Memory<T>` for performance-critical code:
+```csharp
+public void ProcessData(ReadOnlySpan<byte> data)
+{
+    // Work with data without allocations
+}
+```
+
+### Use String Interpolation for Simple Cases
+✅ For simple strings:
+```csharp
+var message = $"Hello, {name}!";
+```
+
+✅ For complex strings or loops, use `StringBuilder`:
+```csharp
+var sb = new StringBuilder();
+foreach (var item in items)
+{
+    sb.AppendLine($"Item: {item}");
+}
+```
+
+## EditorConfig Settings
+
+The project uses `.editorconfig` for consistent formatting:
+- Indent: 4 spaces
+- End of line: CRLF (Windows)
+- Charset: UTF-8
+- Trim trailing whitespace: true
+- Insert final newline: true
+
+## Quick Checklist
+
+Before committing code, verify:
+- [ ] File-scoped namespaces used
+- [ ] Nullable reference types handled
+- [ ] CancellationToken passed to async methods
+- [ ] XML documentation for public APIs
+- [ ] Proper naming conventions followed
+- [ ] No unnecessary allocations in hot paths
+- [ ] Structured logging used
+- [ ] Exceptions properly handled
+- [ ] Async methods end with `Async`
+- [ ] Tests written for new functionality
+# .NET 9 & C# Coding Conventions for DevMetrics Pro
+
+## General C# Conventions
+
+### Language Version
+- Use C# 12 features (latest with .NET 9)
+- Enable nullable reference types: `<Nullable>enable</Nullable>`
+- Use file-scoped namespaces (C# 10+)
+- Use implicit usings: `<ImplicitUsings>enable</ImplicitUsings>`
+
+### File-Scoped Namespaces
+✅ **USE THIS**:
+```csharp
+namespace DevMetricsPro.Core.Entities;
+
+public class Developer : BaseEntity
+{
+    // ...
+}
+```
+
+❌ **NOT THIS**:
+```csharp
+namespace DevMetricsPro.Core.Entities
+{
+    public class Developer : BaseEntity
+    {
+        // ...
+    }
+}
+```
+
+## Naming Conventions
+
+### Classes, Records, Structs
+- **PascalCase** for types
+- Descriptive, meaningful names
+- Avoid abbreviations
+
+```csharp
+public class Developer { }
+public record DeveloperDto(string Email, string DisplayName);
+public struct MetricValue { }
+```
+
+### Interfaces
+- Start with `I` followed by **PascalCase**
+
+```csharp
+public interface IDeveloperService { }
+public interface IRepository<T> where T : class { }
+```
+
+### Methods
+- **PascalCase** for method names
+- Async methods should end with `Async`
+- Use verbs for method names
+
+```csharp
+public async Task<Developer> GetDeveloperAsync(Guid id, CancellationToken cancellationToken)
+{
+    // ...
+}
+
+public void CalculateMetrics() { }
+```
+
+### Properties
+- **PascalCase** for properties
+- Use expression-bodied properties when appropriate
+
+```csharp
+public string DisplayName { get; set; }
+public string FullName => $"{FirstName} {LastName}";
+public bool IsActive { get; init; } = true;
+```
+
+### Fields
+- **_camelCase** for private fields (with underscore)
+- **PascalCase** for public fields (avoid public fields - use properties)
+
+```csharp
+private readonly ILogger<DeveloperService> _logger;
+private string _cachedValue;
+```
+
+### Parameters and Local Variables
+- **camelCase** for parameters and locals
+
+```csharp
+public void ProcessDeveloper(Developer developer, string displayName)
+{
+    var emailAddress = developer.Email;
+    var isValid = ValidateEmail(emailAddress);
+}
+```
+
+### Constants
+- **PascalCase** for constants
+
+```csharp
+private const int MaxRetryAttempts = 3;
+public const string ApiVersion = "v1";
+```
+
+## Modern C# Features to Use
+
+### Primary Constructors (C# 12)
+✅ For simple DTOs and records:
+```csharp
+public record DeveloperDto(Guid Id, string Email, string DisplayName);
+
+public class MetricCalculator(ILogger<MetricCalculator> logger)
+{
+    public void Calculate()
+    {
+        logger.LogInformation("Calculating metrics");
+    }
+}
+```
+
+### Collection Expressions (C# 12)
+✅ Use collection expressions:
+```csharp
+List<string> names = ["Alice", "Bob", "Charlie"];
+int[] numbers = [1, 2, 3, 4, 5];
+```
+
+### Required Members
+✅ Use `required` for must-set properties:
+```csharp
+public class CreateDeveloperRequest
+{
+    public required string Email { get; init; }
+    public string? DisplayName { get; init; }
+}
+```
+
+### Pattern Matching
+✅ Use pattern matching extensively:
+```csharp
+public string GetStatusMessage(PullRequestStatus status) => status switch
+{
+    PullRequestStatus.Open => "Open for review",
+    PullRequestStatus.Merged => "Successfully merged",
+    PullRequestStatus.Closed => "Closed without merge",
+    _ => throw new ArgumentException($"Unknown status: {status}")
+};
+```
+
+### Null-Conditional Operators
+✅ Use `?.` and `??` for null safety:
+```csharp
+var username = developer?.GitHubUsername ?? "Unknown";
+var commitCount = repository?.Commits?.Count ?? 0;
+```
+
+### String Interpolation
+✅ Use string interpolation over concatenation:
+```csharp
+var message = $"Developer {developer.Email} has {commitCount} commits";
+```
+
+## Async/Await Patterns
+
+### Always Use CancellationToken
+✅ **REQUIRED**: Pass CancellationToken to all async methods:
+```csharp
+public async Task<Developer> GetDeveloperAsync(
+    Guid id, 
+    CancellationToken cancellationToken = default)
+{
+    return await _context.Developers
+        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+}
+```
+
+### ConfigureAwait
+❌ **DON'T USE** `ConfigureAwait(false)` in ASP.NET Core projects:
+```csharp
+// NO: Not needed in ASP.NET Core
+await SomeMethodAsync().ConfigureAwait(false);
+
+// YES: Simple await
+await SomeMethodAsync();
+```
+
+### ValueTask for Hot Paths
+✅ Use `ValueTask<T>` for frequently called methods that often complete synchronously:
+```csharp
+public ValueTask<Developer?> GetCachedDeveloperAsync(Guid id)
+{
+    if (_cache.TryGetValue(id, out var developer))
+    {
+        return ValueTask.FromResult(developer);
+    }
+    
+    return new ValueTask<Developer?>(LoadDeveloperAsync(id));
+}
+```
+
+## LINQ Conventions
+
+### Prefer Method Syntax
+✅ Use method syntax (unless query syntax is clearer):
+```csharp
+var activeDevelopers = developers
+    .Where(d => d.IsActive)
+    .OrderBy(d => d.DisplayName)
+    .Take(10);
+```
+
+### Async LINQ with EF Core
+✅ Use EF Core async methods:
+```csharp
+var developers = await _context.Developers
+    .Where(d => d.Email.Contains("@example.com"))
+    .ToListAsync(cancellationToken);
+
+var count = await _context.Commits
+    .CountAsync(c => c.DeveloperId == id, cancellationToken);
+```
+
+## Dependency Injection
+
+### Constructor Injection
+✅ **ALWAYS** use constructor injection:
+```csharp
+public class DeveloperService
+{
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<DeveloperService> _logger;
+
+    public DeveloperService(
+        IUnitOfWork unitOfWork,
+        ILogger<DeveloperService> logger)
+    {
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+}
+```
+
+### Service Lifetimes
+- **Transient**: Created each time (use for lightweight, stateless services)
+- **Scoped**: Per HTTP request (use for DbContext, UnitOfWork)
+- **Singleton**: Once per application (use for caches, configuration)
+
+```csharp
+// In Program.cs
+builder.Services.AddTransient<IMetricCalculator, MetricCalculator>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
+```
+
+## Error Handling
+
+### Use Exceptions for Exceptional Cases
+✅ Throw meaningful exceptions:
+```csharp
+public class DeveloperService
+{
+    public async Task<Developer> GetDeveloperAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var developer = await _unitOfWork.Repository<Developer>()
+            .GetByIdAsync(id, cancellationToken);
+            
+        if (developer is null)
+        {
+            throw new NotFoundException($"Developer with ID {id} not found");
+        }
+        
+        return developer;
+    }
+}
+```
+
+### Custom Exceptions
+✅ Create domain-specific exceptions in Core:
+```csharp
+namespace DevMetricsPro.Core.Exceptions;
+
+public class NotFoundException : Exception
+{
+    public NotFoundException(string message) : base(message) { }
+}
+
+public class ValidationException : Exception
+{
+    public ValidationException(string message) : base(message) { }
+}
+```
+
+## Logging
+
+### Structured Logging
+✅ Use structured logging with ILogger:
+```csharp
+_logger.LogInformation(
+    "Processing developer {DeveloperId} with {CommitCount} commits",
+    developer.Id,
+    commitCount);
+
+_logger.LogError(
+    exception,
+    "Failed to sync repository {RepositoryId}",
+    repositoryId);
+```
+
+### Log Levels
+- **Trace**: Very detailed (development only)
+- **Debug**: Debugging information
+- **Information**: General flow
+- **Warning**: Unexpected but recoverable
+- **Error**: Errors and exceptions
+- **Critical**: Critical failures
+
+## Code Style
+
+### Braces
+✅ Always use braces, even for single-line statements:
+```csharp
+if (developer.IsActive)
+{
+    await ProcessDeveloperAsync(developer, cancellationToken);
+}
+```
+
+### Spacing
+✅ Consistent spacing:
+```csharp
+// Space after control keywords
+if (condition) { }
+for (int i = 0; i < count; i++) { }
+
+// No space for method calls
+SomeMethod(param1, param2);
+
+// Space around operators
+var result = value1 + value2;
+```
+
+### Line Length
+- Maximum 120 characters per line
+- Break long lines logically
+
+### Regions
+❌ **AVOID** regions - they hide code:
+```csharp
+// NO
+#region Private Methods
+private void Something() { }
+#endregion
+```
+
+## XML Documentation
+
+### Public APIs Must Have Documentation
+✅ Document all public APIs:
+```csharp
+/// <summary>
+/// Gets a developer by their unique identifier.
+/// </summary>
+/// <param name="id">The unique identifier of the developer.</param>
+/// <param name="cancellationToken">Cancellation token.</param>
+/// <returns>The developer if found, null otherwise.</returns>
+/// <exception cref="ArgumentException">Thrown when id is empty.</exception>
+public async Task<Developer?> GetDeveloperAsync(
+    Guid id, 
+    CancellationToken cancellationToken = default)
+{
+    // ...
+}
+```
+
+## Performance Best Practices
+
+### Avoid Allocations in Hot Paths
+✅ Use `Span<T>` and `Memory<T>` for performance-critical code:
+```csharp
+public void ProcessData(ReadOnlySpan<byte> data)
+{
+    // Work with data without allocations
+}
+```
+
+### Use String Interpolation for Simple Cases
+✅ For simple strings:
+```csharp
+var message = $"Hello, {name}!";
+```
+
+✅ For complex strings or loops, use `StringBuilder`:
+```csharp
+var sb = new StringBuilder();
+foreach (var item in items)
+{
+    sb.AppendLine($"Item: {item}");
+}
+```
+
+## EditorConfig Settings
+
+The project uses `.editorconfig` for consistent formatting:
+- Indent: 4 spaces
+- End of line: CRLF (Windows)
+- Charset: UTF-8
+- Trim trailing whitespace: true
+- Insert final newline: true
+
+## Quick Checklist
+
+Before committing code, verify:
+- [ ] File-scoped namespaces used
+- [ ] Nullable reference types handled
+- [ ] CancellationToken passed to async methods
+- [ ] XML documentation for public APIs
+- [ ] Proper naming conventions followed
+- [ ] No unnecessary allocations in hot paths
+- [ ] Structured logging used
+- [ ] Exceptions properly handled
+- [ ] Async methods end with `Async`
+- [ ] Tests written for new functionality
