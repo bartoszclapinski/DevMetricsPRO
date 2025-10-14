@@ -1,0 +1,1316 @@
+---
+alwaysApply: false
+---
+
+# Entity Framework Core & Database Rules for DevMetrics Pro
+
+## Database Stack
+
+- **Primary Database**: PostgreSQL 16
+- **ORM**: Entity Framework Core 9
+- **Time-Series**: TimescaleDB extension (for metrics)
+- **Caching**: Redis 7
+- **Migrations**: EF Core Migrations
+
+## Entity Configuration
+
+### Use Fluent API (Not Attributes)
+✅ **REQUIRED**: Configure entities using Fluent API in separate configuration classes:
+
+```csharp
+// ❌ DON'T DO THIS (attributes on entity)
+public class Developer : BaseEntity
+{
+    [Required]
+    [MaxLength(255)]
+    public string Email { get; set; }
+}
+
+// ✅ DO THIS (Fluent API in configuration)
+public class DeveloperConfiguration : IEntityTypeConfiguration<Developer>
+{
+    public void Configure(EntityTypeBuilder<Developer> builder)
+    {
+        builder.ToTable("Developers");
+        
+        builder.HasKey(d => d.Id);
+        
+        builder.Property(d => d.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+            
+        builder.HasIndex(d => d.Email)
+            .IsUnique();
+    }
+}
+```
+
+### Configuration File Organization
+```
+Infrastructure/Data/Configurations/
+├── DeveloperConfiguration.cs
+├── RepositoryConfiguration.cs
+├── CommitConfiguration.cs
+├── PullRequestConfiguration.cs
+└── MetricConfiguration.cs
+```
+
+### Complete Configuration Example
+```csharp
+using DevMetricsPro.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace DevMetricsPro.Infrastructure.Data.Configurations;
+
+public class DeveloperConfiguration : IEntityTypeConfiguration<Developer>
+{
+    public void Configure(EntityTypeBuilder<Developer> builder)
+    {
+        // Table name
+        builder.ToTable("Developers");
+        
+        // Primary key
+        builder.HasKey(d => d.Id);
+        
+        // Properties
+        builder.Property(d => d.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+            
+        builder.Property(d => d.DisplayName)
+            .HasMaxLength(200);
+            
+        builder.Property(d => d.GitHubUsername)
+            .HasMaxLength(100);
+            
+        builder.Property(d => d.AvatarUrl)
+            .HasMaxLength(500);
+            
+        // Indexes
+        builder.HasIndex(d => d.Email)
+            .IsUnique()
+            .HasDatabaseName("IX_Developers_Email");
+            
+        builder.HasIndex(d => d.GitHubUsername)
+            .HasDatabaseName("IX_Developers_GitHubUsername");
+            
+        // Relationships
+        builder.HasMany(d => d.Commits)
+            .WithOne(c => c.Developer)
+            .HasForeignKey(c => c.DeveloperId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        builder.HasMany(d => d.Metrics)
+            .WithOne(m => m.Developer)
+            .HasForeignKey(m => m.DeveloperId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        // Soft delete query filter
+        builder.HasQueryFilter(d => !d.IsDeleted);
+    }
+}
+```
+
+## DbContext
+
+### ApplicationDbContext Structure
+```csharp
+using DevMetricsPro.Core.Entities;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+
+namespace DevMetricsPro.Infrastructure.Data;
+
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options)
+    {
+    }
+
+    // DbSets
+    public DbSet<Developer> Developers => Set<Developer>();
+    public DbSet<Repository> Repositories => Set<Repository>();
+    public DbSet<Commit> Commits => Set<Commit>();
+    public DbSet<PullRequest> PullRequests => Set<PullRequest>();
+    public DbSet<Metric> Metrics => Set<Metric>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        
+        // Apply all configurations from assembly
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        
+        // Custom conventions
+        ConfigureConventions(modelBuilder);
+    }
+    
+    private void ConfigureConventions(ModelBuilder modelBuilder)
+    {
+        // Set default max length for strings
+        foreach (var property in modelBuilder.Model.GetEntityTypes()
+            .SelectMany(t => t.GetProperties())
+            .Where(p => p.ClrType == typeof(string)))
+        {
+            if (property.GetMaxLength() == null)
+            {
+                property.SetMaxLength(500);
+            }
+        }
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // Update timestamps automatically
+        UpdateTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+    
+    private void UpdateTimestamps()
+    {
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is BaseEntity && e.State == EntityState.Modified);
+            
+        foreach (var entry in entries)
+        {
+            ((BaseEntity)entry.Entity).UpdatedAt = DateTime.UtcNow;
+        }
+    }
+}
+```
+
+## Migrations
+
+### Creating Migrations
+```bash
+# Create a new migration
+dotnet ef migrations add MigrationName -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web -o Data/Migrations
+
+# Apply migrations
+dotnet ef database update -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
+
+# Remove last migration (if not applied)
+dotnet ef migrations remove -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
+
+# Generate SQL script
+dotnet ef migrations script -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web -o migration.sql
+```
+
+### Migration Naming Convention
+- **PascalCase** with descriptive names
+- Include date prefix for ordering: `20241014_AddDeveloperMetrics`
+- Use verb-noun format: `AddCommitsTable`, `UpdateDeveloperIndex`
+
+### Custom Migration Code
+✅ Add custom SQL for PostgreSQL-specific features:
+```csharp
+public partial class AddTimescaleExtension : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        // Create TimescaleDB extension
+        migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;");
+        
+        // Create metrics table
+        migrationBuilder.CreateTable(
+            name: "Metrics",
+            // ...
+        );
+        
+        // Convert to hypertable for time-series optimization
+        migrationBuilder.Sql(
+            "SELECT create_hypertable('Metrics', 'Timestamp', if_not_exists => TRUE);"
+        );
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(name: "Metrics");
+        migrationBuilder.Sql("DROP EXTENSION IF EXISTS timescaledb CASCADE;");
+    }
+}
+```
+
+## Querying Best Practices
+
+### Always Use Async Methods
+✅ **REQUIRED**: Use async methods with CancellationToken:
+```csharp
+// ✅ Correct
+var developers = await _context.Developers
+    .Where(d => d.IsActive)
+    .ToListAsync(cancellationToken);
+
+// ❌ Wrong - blocks thread
+var developers = _context.Developers
+    .Where(d => d.IsActive)
+    .ToList();
+```
+
+### Projection to DTOs
+✅ **Use Select() to avoid over-fetching**:
+```csharp
+// ✅ Good - only fetches needed columns
+var developers = await _context.Developers
+    .Select(d => new DeveloperDto
+    {
+        Id = d.Id,
+        Email = d.Email,
+        DisplayName = d.DisplayName
+    })
+    .ToListAsync(cancellationToken);
+
+// ❌ Bad - fetches all columns, then maps
+var developers = await _context.Developers
+    .ToListAsync(cancellationToken);
+var dtos = developers.Select(d => new DeveloperDto { ... });
+```
+
+### Include Related Data
+✅ **Use Include() for eager loading**:
+```csharp
+var developer = await _context.Developers
+    .Include(d => d.Commits.Take(10))
+    .Include(d => d.Metrics.Where(m => m.Timestamp > startDate))
+    .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+```
+
+### Avoid N+1 Queries
+❌ **DON'T** load related data in a loop:
+```csharp
+// ❌ BAD - N+1 queries
+var developers = await _context.Developers.ToListAsync();
+foreach (var dev in developers)
+{
+    dev.Commits = await _context.Commits
+        .Where(c => c.DeveloperId == dev.Id)
+        .ToListAsync(); // Separate query for each developer!
+}
+
+// ✅ GOOD - single query with Include
+var developers = await _context.Developers
+    .Include(d => d.Commits)
+    .ToListAsync(cancellationToken);
+```
+
+### Pagination
+✅ **Always paginate large datasets**:
+```csharp
+public async Task<PagedResult<DeveloperDto>> GetDevelopersPagedAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken)
+{
+    var query = _context.Developers.AsQueryable();
+    
+    var totalCount = await query.CountAsync(cancellationToken);
+    
+    var items = await query
+        .OrderBy(d => d.DisplayName)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(d => new DeveloperDto
+        {
+            Id = d.Id,
+            Email = d.Email,
+            DisplayName = d.DisplayName
+        })
+        .ToListAsync(cancellationToken);
+        
+    return new PagedResult<DeveloperDto>
+    {
+        Items = items,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize
+    };
+}
+```
+
+### AsNoTracking for Read-Only Queries
+✅ **Use AsNoTracking() for better performance**:
+```csharp
+// For read-only queries (no updates)
+var developers = await _context.Developers
+    .AsNoTracking()
+    .ToListAsync(cancellationToken);
+```
+
+## Indexes
+
+### When to Create Indexes
+Create indexes for:
+- Primary keys (automatic)
+- Foreign keys (usually automatic)
+- Columns in WHERE clauses
+- Columns in JOIN conditions
+- Columns in ORDER BY clauses
+- Unique constraints
+
+### Index Examples
+```csharp
+builder.HasIndex(d => d.Email)
+    .IsUnique()
+    .HasDatabaseName("IX_Developers_Email");
+
+builder.HasIndex(d => d.GitHubUsername)
+    .HasDatabaseName("IX_Developers_GitHubUsername");
+    
+// Composite index
+builder.HasIndex(c => new { c.RepositoryId, c.CommittedAt })
+    .HasDatabaseName("IX_Commits_Repository_Date");
+```
+
+## Soft Delete Implementation
+
+### Base Entity with Soft Delete
+```csharp
+public abstract class BaseEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; } = false;
+}
+```
+
+### Global Query Filter
+```csharp
+// In entity configuration
+builder.HasQueryFilter(d => !d.IsDeleted);
+```
+
+### Soft Delete Method
+```csharp
+public async Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken)
+{
+    var entity = await _context.Developers
+        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        
+    if (entity != null)
+    {
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// Query including deleted items
+var allDevelopers = await _context.Developers
+    .IgnoreQueryFilters()
+    .ToListAsync(cancellationToken);
+```
+
+## Transactions
+
+### Using Transactions
+```csharp
+public async Task TransferDataAsync(CancellationToken cancellationToken)
+{
+    using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+    
+    try
+    {
+        // Multiple operations
+        await _context.Developers.AddAsync(newDeveloper, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        await _context.Metrics.AddRangeAsync(metrics, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
+    }
+    catch
+    {
+        await transaction.RollbackAsync(cancellationToken);
+        throw;
+    }
+}
+```
+
+## Raw SQL Queries
+
+### When to Use Raw SQL
+- Complex queries that are difficult in LINQ
+- Performance-critical queries
+- PostgreSQL-specific features
+- Bulk operations
+
+### FromSqlRaw Example
+```csharp
+var developers = await _context.Developers
+    .FromSqlRaw(@"
+        SELECT d.*
+        FROM ""Developers"" d
+        INNER JOIN ""Commits"" c ON d.""Id"" = c.""DeveloperId""
+        WHERE c.""CommittedAt"" > {0}
+        GROUP BY d.""Id""
+        HAVING COUNT(c.""Id"") > {1}",
+        startDate,
+        minCommits)
+    .ToListAsync(cancellationToken);
+```
+
+### ExecuteSqlRaw for Updates
+```csharp
+var affected = await _context.Database.ExecuteSqlRawAsync(
+    "UPDATE \"Developers\" SET \"IsActive\" = false WHERE \"LastLoginAt\" < {0}",
+    cutoffDate,
+    cancellationToken);
+```
+
+## PostgreSQL-Specific Features
+
+### JSON Columns
+```csharp
+// Entity property
+public string? Metadata { get; set; } // Store JSON
+
+// Configuration
+builder.Property(m => m.Metadata)
+    .HasColumnType("jsonb"); // PostgreSQL JSONB type
+
+// Query JSON
+var metrics = await _context.Metrics
+    .Where(m => EF.Functions.JsonContains(m.Metadata, "{\"type\":\"commit\"}"))
+    .ToListAsync(cancellationToken);
+```
+
+### Full-Text Search
+```csharp
+// Add generated column for search
+migrationBuilder.Sql(@"
+    ALTER TABLE ""Developers""
+    ADD COLUMN ""SearchVector"" tsvector
+    GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce(""DisplayName"", '') || ' ' || coalesce(""Email"", ''))
+    ) STORED;
+");
+
+// Add index
+migrationBuilder.Sql(@"
+    CREATE INDEX ""IX_Developers_SearchVector""
+    ON ""Developers""
+    USING GIN(""SearchVector"");
+");
+
+// Query
+var results = await _context.Developers
+    .FromSqlRaw(@"
+        SELECT * FROM ""Developers""
+        WHERE ""SearchVector"" @@ to_tsquery('english', {0})
+        ORDER BY ts_rank(""SearchVector"", to_tsquery('english', {0})) DESC",
+        searchTerm)
+    .ToListAsync(cancellationToken);
+```
+
+## Connection String Configuration
+
+### Development
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=devmetrics_dev;Username=devmetrics;Password=Dev123456!;Include Error Detail=true"
+  }
+}
+```
+
+### Production
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=postgres.example.com;Port=5432;Database=devmetrics_prod;Username=app_user;Password=xxx;SSL Mode=Require;Trust Server Certificate=true"
+  }
+}
+```
+
+## Database Seeding
+
+### Seed Data for Development
+```csharp
+public static class DbInitializer
+{
+    public static async Task SeedAsync(ApplicationDbContext context)
+    {
+        if (await context.Developers.AnyAsync())
+        {
+            return; // Already seeded
+        }
+
+        var developers = new[]
+        {
+            new Developer
+            {
+                Email = "john@example.com",
+                DisplayName = "John Doe",
+                GitHubUsername = "johndoe"
+            },
+            new Developer
+            {
+                Email = "jane@example.com",
+                DisplayName = "Jane Smith",
+                GitHubUsername = "janesmith"
+            }
+        };
+
+        await context.Developers.AddRangeAsync(developers);
+        await context.SaveChangesAsync();
+    }
+}
+```
+
+## Performance Optimization
+
+### Compiled Queries
+✅ For frequently-executed queries:
+```csharp
+private static readonly Func<ApplicationDbContext, Guid, Task<Developer?>> _getDeveloperQuery =
+    EF.CompileAsyncQuery((ApplicationDbContext context, Guid id) =>
+        context.Developers
+            .Include(d => d.Commits)
+            .FirstOrDefault(d => d.Id == id));
+
+public async Task<Developer?> GetDeveloperAsync(Guid id)
+{
+    return await _getDeveloperQuery(_context, id);
+}
+```
+
+### Batch Operations
+✅ Use AddRange/UpdateRange for bulk operations:
+```csharp
+// ✅ Good - single batch insert
+await _context.Commits.AddRangeAsync(commits, cancellationToken);
+await _context.SaveChangesAsync(cancellationToken);
+
+// ❌ Bad - individual inserts
+foreach (var commit in commits)
+{
+    await _context.Commits.AddAsync(commit, cancellationToken);
+    await _context.SaveChangesAsync(cancellationToken);
+}
+```
+
+## Testing
+
+### In-Memory Database for Tests
+```csharp
+var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+    .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+    .Options;
+
+using var context = new ApplicationDbContext(options);
+// Run tests
+```
+
+### Test Database Cleanup
+```csharp
+public class RepositoryTestBase : IDisposable
+{
+    protected readonly ApplicationDbContext Context;
+
+    public RepositoryTestBase()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        Context = new ApplicationDbContext(options);
+    }
+
+    public void Dispose()
+    {
+        Context.Dispose();
+    }
+}
+```
+
+## Common Pitfalls to Avoid
+
+❌ **DON'T** use synchronous methods (ToList, First, etc.)
+❌ **DON'T** forget to dispose DbContext
+❌ **DON'T** track entities for read-only queries
+❌ **DON'T** fetch more data than needed
+❌ **DON'T** ignore N+1 query problems
+❌ **DON'T** forget to add indexes
+❌ **DON'T** use magic strings for table/column names
+❌ **DON'T** mix EF and raw SQL without good reason
+
+✅ **DO** use async/await everywhere
+✅ **DO** use proper scoping for DbContext
+✅ **DO** use AsNoTracking for read-only queries
+✅ **DO** project to DTOs with Select()
+✅ **DO** use Include() for related data
+✅ **DO** create appropriate indexes
+✅ **DO** use Fluent API for configuration
+✅ **DO** handle concurrency conflicts
+
+## Quick Checklist
+
+Before committing database code:
+- [ ] Fluent API used for entity configuration
+- [ ] Async methods with CancellationToken
+- [ ] AsNoTracking for read-only queries
+- [ ] Appropriate indexes created
+- [ ] Migration tested locally
+- [ ] No N+1 queries
+- [ ] Proper error handling
+- [ ] Query performance tested with sample data
+# Entity Framework Core & Database Rules for DevMetrics Pro
+
+## Database Stack
+
+- **Primary Database**: PostgreSQL 16
+- **ORM**: Entity Framework Core 9
+- **Time-Series**: TimescaleDB extension (for metrics)
+- **Caching**: Redis 7
+- **Migrations**: EF Core Migrations
+
+## Entity Configuration
+
+### Use Fluent API (Not Attributes)
+✅ **REQUIRED**: Configure entities using Fluent API in separate configuration classes:
+
+```csharp
+// ❌ DON'T DO THIS (attributes on entity)
+public class Developer : BaseEntity
+{
+    [Required]
+    [MaxLength(255)]
+    public string Email { get; set; }
+}
+
+// ✅ DO THIS (Fluent API in configuration)
+public class DeveloperConfiguration : IEntityTypeConfiguration<Developer>
+{
+    public void Configure(EntityTypeBuilder<Developer> builder)
+    {
+        builder.ToTable("Developers");
+        
+        builder.HasKey(d => d.Id);
+        
+        builder.Property(d => d.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+            
+        builder.HasIndex(d => d.Email)
+            .IsUnique();
+    }
+}
+```
+
+### Configuration File Organization
+```
+Infrastructure/Data/Configurations/
+├── DeveloperConfiguration.cs
+├── RepositoryConfiguration.cs
+├── CommitConfiguration.cs
+├── PullRequestConfiguration.cs
+└── MetricConfiguration.cs
+```
+
+### Complete Configuration Example
+```csharp
+using DevMetricsPro.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace DevMetricsPro.Infrastructure.Data.Configurations;
+
+public class DeveloperConfiguration : IEntityTypeConfiguration<Developer>
+{
+    public void Configure(EntityTypeBuilder<Developer> builder)
+    {
+        // Table name
+        builder.ToTable("Developers");
+        
+        // Primary key
+        builder.HasKey(d => d.Id);
+        
+        // Properties
+        builder.Property(d => d.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+            
+        builder.Property(d => d.DisplayName)
+            .HasMaxLength(200);
+            
+        builder.Property(d => d.GitHubUsername)
+            .HasMaxLength(100);
+            
+        builder.Property(d => d.AvatarUrl)
+            .HasMaxLength(500);
+            
+        // Indexes
+        builder.HasIndex(d => d.Email)
+            .IsUnique()
+            .HasDatabaseName("IX_Developers_Email");
+            
+        builder.HasIndex(d => d.GitHubUsername)
+            .HasDatabaseName("IX_Developers_GitHubUsername");
+            
+        // Relationships
+        builder.HasMany(d => d.Commits)
+            .WithOne(c => c.Developer)
+            .HasForeignKey(c => c.DeveloperId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        builder.HasMany(d => d.Metrics)
+            .WithOne(m => m.Developer)
+            .HasForeignKey(m => m.DeveloperId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        // Soft delete query filter
+        builder.HasQueryFilter(d => !d.IsDeleted);
+    }
+}
+```
+
+## DbContext
+
+### ApplicationDbContext Structure
+```csharp
+using DevMetricsPro.Core.Entities;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+
+namespace DevMetricsPro.Infrastructure.Data;
+
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options)
+    {
+    }
+
+    // DbSets
+    public DbSet<Developer> Developers => Set<Developer>();
+    public DbSet<Repository> Repositories => Set<Repository>();
+    public DbSet<Commit> Commits => Set<Commit>();
+    public DbSet<PullRequest> PullRequests => Set<PullRequest>();
+    public DbSet<Metric> Metrics => Set<Metric>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        
+        // Apply all configurations from assembly
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        
+        // Custom conventions
+        ConfigureConventions(modelBuilder);
+    }
+    
+    private void ConfigureConventions(ModelBuilder modelBuilder)
+    {
+        // Set default max length for strings
+        foreach (var property in modelBuilder.Model.GetEntityTypes()
+            .SelectMany(t => t.GetProperties())
+            .Where(p => p.ClrType == typeof(string)))
+        {
+            if (property.GetMaxLength() == null)
+            {
+                property.SetMaxLength(500);
+            }
+        }
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // Update timestamps automatically
+        UpdateTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+    
+    private void UpdateTimestamps()
+    {
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is BaseEntity && e.State == EntityState.Modified);
+            
+        foreach (var entry in entries)
+        {
+            ((BaseEntity)entry.Entity).UpdatedAt = DateTime.UtcNow;
+        }
+    }
+}
+```
+
+## Migrations
+
+### Creating Migrations
+```bash
+# Create a new migration
+dotnet ef migrations add MigrationName -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web -o Data/Migrations
+
+# Apply migrations
+dotnet ef database update -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
+
+# Remove last migration (if not applied)
+dotnet ef migrations remove -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
+
+# Generate SQL script
+dotnet ef migrations script -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web -o migration.sql
+```
+
+### Migration Naming Convention
+- **PascalCase** with descriptive names
+- Include date prefix for ordering: `20241014_AddDeveloperMetrics`
+- Use verb-noun format: `AddCommitsTable`, `UpdateDeveloperIndex`
+
+### Custom Migration Code
+✅ Add custom SQL for PostgreSQL-specific features:
+```csharp
+public partial class AddTimescaleExtension : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        // Create TimescaleDB extension
+        migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;");
+        
+        // Create metrics table
+        migrationBuilder.CreateTable(
+            name: "Metrics",
+            // ...
+        );
+        
+        // Convert to hypertable for time-series optimization
+        migrationBuilder.Sql(
+            "SELECT create_hypertable('Metrics', 'Timestamp', if_not_exists => TRUE);"
+        );
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(name: "Metrics");
+        migrationBuilder.Sql("DROP EXTENSION IF EXISTS timescaledb CASCADE;");
+    }
+}
+```
+
+## Querying Best Practices
+
+### Always Use Async Methods
+✅ **REQUIRED**: Use async methods with CancellationToken:
+```csharp
+// ✅ Correct
+var developers = await _context.Developers
+    .Where(d => d.IsActive)
+    .ToListAsync(cancellationToken);
+
+// ❌ Wrong - blocks thread
+var developers = _context.Developers
+    .Where(d => d.IsActive)
+    .ToList();
+```
+
+### Projection to DTOs
+✅ **Use Select() to avoid over-fetching**:
+```csharp
+// ✅ Good - only fetches needed columns
+var developers = await _context.Developers
+    .Select(d => new DeveloperDto
+    {
+        Id = d.Id,
+        Email = d.Email,
+        DisplayName = d.DisplayName
+    })
+    .ToListAsync(cancellationToken);
+
+// ❌ Bad - fetches all columns, then maps
+var developers = await _context.Developers
+    .ToListAsync(cancellationToken);
+var dtos = developers.Select(d => new DeveloperDto { ... });
+```
+
+### Include Related Data
+✅ **Use Include() for eager loading**:
+```csharp
+var developer = await _context.Developers
+    .Include(d => d.Commits.Take(10))
+    .Include(d => d.Metrics.Where(m => m.Timestamp > startDate))
+    .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+```
+
+### Avoid N+1 Queries
+❌ **DON'T** load related data in a loop:
+```csharp
+// ❌ BAD - N+1 queries
+var developers = await _context.Developers.ToListAsync();
+foreach (var dev in developers)
+{
+    dev.Commits = await _context.Commits
+        .Where(c => c.DeveloperId == dev.Id)
+        .ToListAsync(); // Separate query for each developer!
+}
+
+// ✅ GOOD - single query with Include
+var developers = await _context.Developers
+    .Include(d => d.Commits)
+    .ToListAsync(cancellationToken);
+```
+
+### Pagination
+✅ **Always paginate large datasets**:
+```csharp
+public async Task<PagedResult<DeveloperDto>> GetDevelopersPagedAsync(
+    int page,
+    int pageSize,
+    CancellationToken cancellationToken)
+{
+    var query = _context.Developers.AsQueryable();
+    
+    var totalCount = await query.CountAsync(cancellationToken);
+    
+    var items = await query
+        .OrderBy(d => d.DisplayName)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(d => new DeveloperDto
+        {
+            Id = d.Id,
+            Email = d.Email,
+            DisplayName = d.DisplayName
+        })
+        .ToListAsync(cancellationToken);
+        
+    return new PagedResult<DeveloperDto>
+    {
+        Items = items,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize
+    };
+}
+```
+
+### AsNoTracking for Read-Only Queries
+✅ **Use AsNoTracking() for better performance**:
+```csharp
+// For read-only queries (no updates)
+var developers = await _context.Developers
+    .AsNoTracking()
+    .ToListAsync(cancellationToken);
+```
+
+## Indexes
+
+### When to Create Indexes
+Create indexes for:
+- Primary keys (automatic)
+- Foreign keys (usually automatic)
+- Columns in WHERE clauses
+- Columns in JOIN conditions
+- Columns in ORDER BY clauses
+- Unique constraints
+
+### Index Examples
+```csharp
+builder.HasIndex(d => d.Email)
+    .IsUnique()
+    .HasDatabaseName("IX_Developers_Email");
+
+builder.HasIndex(d => d.GitHubUsername)
+    .HasDatabaseName("IX_Developers_GitHubUsername");
+    
+// Composite index
+builder.HasIndex(c => new { c.RepositoryId, c.CommittedAt })
+    .HasDatabaseName("IX_Commits_Repository_Date");
+```
+
+## Soft Delete Implementation
+
+### Base Entity with Soft Delete
+```csharp
+public abstract class BaseEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; } = false;
+}
+```
+
+### Global Query Filter
+```csharp
+// In entity configuration
+builder.HasQueryFilter(d => !d.IsDeleted);
+```
+
+### Soft Delete Method
+```csharp
+public async Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken)
+{
+    var entity = await _context.Developers
+        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        
+    if (entity != null)
+    {
+        entity.IsDeleted = true;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// Query including deleted items
+var allDevelopers = await _context.Developers
+    .IgnoreQueryFilters()
+    .ToListAsync(cancellationToken);
+```
+
+## Transactions
+
+### Using Transactions
+```csharp
+public async Task TransferDataAsync(CancellationToken cancellationToken)
+{
+    using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+    
+    try
+    {
+        // Multiple operations
+        await _context.Developers.AddAsync(newDeveloper, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        await _context.Metrics.AddRangeAsync(metrics, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
+    }
+    catch
+    {
+        await transaction.RollbackAsync(cancellationToken);
+        throw;
+    }
+}
+```
+
+## Raw SQL Queries
+
+### When to Use Raw SQL
+- Complex queries that are difficult in LINQ
+- Performance-critical queries
+- PostgreSQL-specific features
+- Bulk operations
+
+### FromSqlRaw Example
+```csharp
+var developers = await _context.Developers
+    .FromSqlRaw(@"
+        SELECT d.*
+        FROM ""Developers"" d
+        INNER JOIN ""Commits"" c ON d.""Id"" = c.""DeveloperId""
+        WHERE c.""CommittedAt"" > {0}
+        GROUP BY d.""Id""
+        HAVING COUNT(c.""Id"") > {1}",
+        startDate,
+        minCommits)
+    .ToListAsync(cancellationToken);
+```
+
+### ExecuteSqlRaw for Updates
+```csharp
+var affected = await _context.Database.ExecuteSqlRawAsync(
+    "UPDATE \"Developers\" SET \"IsActive\" = false WHERE \"LastLoginAt\" < {0}",
+    cutoffDate,
+    cancellationToken);
+```
+
+## PostgreSQL-Specific Features
+
+### JSON Columns
+```csharp
+// Entity property
+public string? Metadata { get; set; } // Store JSON
+
+// Configuration
+builder.Property(m => m.Metadata)
+    .HasColumnType("jsonb"); // PostgreSQL JSONB type
+
+// Query JSON
+var metrics = await _context.Metrics
+    .Where(m => EF.Functions.JsonContains(m.Metadata, "{\"type\":\"commit\"}"))
+    .ToListAsync(cancellationToken);
+```
+
+### Full-Text Search
+```csharp
+// Add generated column for search
+migrationBuilder.Sql(@"
+    ALTER TABLE ""Developers""
+    ADD COLUMN ""SearchVector"" tsvector
+    GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce(""DisplayName"", '') || ' ' || coalesce(""Email"", ''))
+    ) STORED;
+");
+
+// Add index
+migrationBuilder.Sql(@"
+    CREATE INDEX ""IX_Developers_SearchVector""
+    ON ""Developers""
+    USING GIN(""SearchVector"");
+");
+
+// Query
+var results = await _context.Developers
+    .FromSqlRaw(@"
+        SELECT * FROM ""Developers""
+        WHERE ""SearchVector"" @@ to_tsquery('english', {0})
+        ORDER BY ts_rank(""SearchVector"", to_tsquery('english', {0})) DESC",
+        searchTerm)
+    .ToListAsync(cancellationToken);
+```
+
+## Connection String Configuration
+
+### Development
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=devmetrics_dev;Username=devmetrics;Password=Dev123456!;Include Error Detail=true"
+  }
+}
+```
+
+### Production
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=postgres.example.com;Port=5432;Database=devmetrics_prod;Username=app_user;Password=xxx;SSL Mode=Require;Trust Server Certificate=true"
+  }
+}
+```
+
+## Database Seeding
+
+### Seed Data for Development
+```csharp
+public static class DbInitializer
+{
+    public static async Task SeedAsync(ApplicationDbContext context)
+    {
+        if (await context.Developers.AnyAsync())
+        {
+            return; // Already seeded
+        }
+
+        var developers = new[]
+        {
+            new Developer
+            {
+                Email = "john@example.com",
+                DisplayName = "John Doe",
+                GitHubUsername = "johndoe"
+            },
+            new Developer
+            {
+                Email = "jane@example.com",
+                DisplayName = "Jane Smith",
+                GitHubUsername = "janesmith"
+            }
+        };
+
+        await context.Developers.AddRangeAsync(developers);
+        await context.SaveChangesAsync();
+    }
+}
+```
+
+## Performance Optimization
+
+### Compiled Queries
+✅ For frequently-executed queries:
+```csharp
+private static readonly Func<ApplicationDbContext, Guid, Task<Developer?>> _getDeveloperQuery =
+    EF.CompileAsyncQuery((ApplicationDbContext context, Guid id) =>
+        context.Developers
+            .Include(d => d.Commits)
+            .FirstOrDefault(d => d.Id == id));
+
+public async Task<Developer?> GetDeveloperAsync(Guid id)
+{
+    return await _getDeveloperQuery(_context, id);
+}
+```
+
+### Batch Operations
+✅ Use AddRange/UpdateRange for bulk operations:
+```csharp
+// ✅ Good - single batch insert
+await _context.Commits.AddRangeAsync(commits, cancellationToken);
+await _context.SaveChangesAsync(cancellationToken);
+
+// ❌ Bad - individual inserts
+foreach (var commit in commits)
+{
+    await _context.Commits.AddAsync(commit, cancellationToken);
+    await _context.SaveChangesAsync(cancellationToken);
+}
+```
+
+## Testing
+
+### In-Memory Database for Tests
+```csharp
+var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+    .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+    .Options;
+
+using var context = new ApplicationDbContext(options);
+// Run tests
+```
+
+### Test Database Cleanup
+```csharp
+public class RepositoryTestBase : IDisposable
+{
+    protected readonly ApplicationDbContext Context;
+
+    public RepositoryTestBase()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        Context = new ApplicationDbContext(options);
+    }
+
+    public void Dispose()
+    {
+        Context.Dispose();
+    }
+}
+```
+
+## Common Pitfalls to Avoid
+
+❌ **DON'T** use synchronous methods (ToList, First, etc.)
+❌ **DON'T** forget to dispose DbContext
+❌ **DON'T** track entities for read-only queries
+❌ **DON'T** fetch more data than needed
+❌ **DON'T** ignore N+1 query problems
+❌ **DON'T** forget to add indexes
+❌ **DON'T** use magic strings for table/column names
+❌ **DON'T** mix EF and raw SQL without good reason
+
+✅ **DO** use async/await everywhere
+✅ **DO** use proper scoping for DbContext
+✅ **DO** use AsNoTracking for read-only queries
+✅ **DO** project to DTOs with Select()
+✅ **DO** use Include() for related data
+✅ **DO** create appropriate indexes
+✅ **DO** use Fluent API for configuration
+✅ **DO** handle concurrency conflicts
+
+## Quick Checklist
+
+Before committing database code:
+- [ ] Fluent API used for entity configuration
+- [ ] Async methods with CancellationToken
+- [ ] AsNoTracking for read-only queries
+- [ ] Appropriate indexes created
+- [ ] Migration tested locally
+- [ ] No N+1 queries
+- [ ] Proper error handling
+- [ ] Query performance tested with sample data

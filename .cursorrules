@@ -1,0 +1,357 @@
+# DevMetrics Pro - Cursor AI Rules
+
+## Project Overview
+
+**DevMetrics Pro** is a real-time developer analytics dashboard built with .NET 9 and Blazor Server. It integrates with GitHub, GitLab, and Jira to provide actionable insights into team productivity, code quality, and project health.
+
+### Technology Stack
+- **.NET 9** with C# 12
+- **Blazor Server** for UI (with SignalR for real-time)
+- **PostgreSQL 16** + **TimescaleDB** for data
+- **Redis 7** for caching
+- **Entity Framework Core 9** for ORM
+- **MudBlazor** for UI components
+- **Hangfire** for background jobs
+
+### Architecture
+- **Clean Architecture** with 4 layers:
+  1. **Core** - Domain entities and interfaces
+  2. **Application** - Business logic and DTOs
+  3. **Infrastructure** - Data access and external services
+  4. **Web** - Blazor UI and API endpoints
+
+---
+
+## 📚 Detailed Rules
+
+This project has comprehensive cursor rules organized by topic. When working on specific areas, refer to:
+
+### Architecture & Structure
+- 📁 **`.cursor/architecture.mdc`** - Clean Architecture principles, layer responsibilities, dependency rules
+
+### .NET & C# Conventions
+- 🔵 **`.cursor/dotnet-conventions.mdc`** - C# 12 features, naming conventions, async patterns, DI
+
+### Blazor Development
+- ⚡ **`.cursor/blazor-rules.mdc`** - Blazor Server patterns, components, lifecycle, MudBlazor usage
+
+### Database & EF Core
+- 🗄️ **`.cursor/database-rules.mdc`** - Entity Framework Core, migrations, queries, PostgreSQL features
+
+### Testing
+- ✅ **`.cursor/testing-rules.mdc`** - xUnit, FluentAssertions, mocking, integration tests
+
+---
+
+## 🎯 Core Principles
+
+### 1. Clean Architecture - Dependency Direction
+```
+Core ← Application ← Infrastructure
+                   ← Web
+```
+**RULE**: Dependencies ONLY point inward. Core has NO dependencies on other layers.
+
+### 2. Async/Await Everywhere
+```csharp
+// ✅ ALWAYS include CancellationToken
+public async Task<Developer> GetDeveloperAsync(
+    Guid id, 
+    CancellationToken cancellationToken = default)
+{
+    return await _context.Developers
+        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+}
+```
+
+### 3. Use DTOs for Data Transfer
+```csharp
+// ❌ DON'T expose entities directly
+public async Task<Developer> GetDeveloperAsync(Guid id) { }
+
+// ✅ DO use DTOs
+public async Task<DeveloperDto> GetDeveloperAsync(Guid id) { }
+```
+
+### 4. Dependency Injection
+```csharp
+// ✅ Constructor injection ALWAYS
+public class DeveloperService
+{
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<DeveloperService> _logger;
+
+    public DeveloperService(
+        IUnitOfWork unitOfWork,
+        ILogger<DeveloperService> logger)
+    {
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+}
+```
+
+### 5. Modern C# Features
+```csharp
+// ✅ File-scoped namespaces
+namespace DevMetricsPro.Core.Entities;
+
+// ✅ Nullable reference types enabled
+public string Email { get; set; } = string.Empty;
+public string? GitHubUsername { get; set; }
+
+// ✅ Required properties
+public required string Email { get; init; }
+
+// ✅ Collection expressions
+List<string> names = ["Alice", "Bob", "Charlie"];
+```
+
+---
+
+## 🏗️ Project Structure
+
+```
+DevMetricsPRO/
+├── .ai/                          # Project documentation
+│   ├── GETTING-STARTED.md       # Quick start guide
+│   ├── prd.md                   # Product requirements
+│   ├── design/
+│   │   └── design-prototype.html
+│   └── sprints/
+│       ├── sprint0/
+│       │   ├── sprint-plan.md
+│       │   └── sprint-log.md
+│       └── sprint1/
+├── .cursor/                      # Cursor rules (this folder)
+│   ├── architecture.mdc
+│   ├── dotnet-conventions.mdc
+│   ├── blazor-rules.mdc
+│   ├── database-rules.mdc
+│   └── testing-rules.mdc
+├── src/
+│   ├── DevMetricsPro.Core/      # Domain layer
+│   │   ├── Entities/
+│   │   ├── Enums/
+│   │   ├── Interfaces/
+│   │   └── Exceptions/
+│   ├── DevMetricsPro.Application/  # Business logic
+│   │   ├── DTOs/
+│   │   ├── Interfaces/
+│   │   ├── Services/
+│   │   └── Validators/
+│   ├── DevMetricsPro.Infrastructure/  # Data & external services
+│   │   ├── Data/
+│   │   │   ├── Configurations/
+│   │   │   └── Migrations/
+│   │   ├── Repositories/
+│   │   └── Services/
+│   └── DevMetricsPro.Web/       # Blazor UI
+│       ├── Components/
+│       │   ├── Layout/
+│       │   ├── Pages/
+│       │   └── Shared/
+│       ├── Controllers/
+│       └── Hubs/
+└── tests/
+    ├── DevMetricsPro.Core.Tests/
+    ├── DevMetricsPro.Application.Tests/
+    └── DevMetricsPro.Integration.Tests/
+```
+
+---
+
+## 🎓 Learning Mode
+
+**IMPORTANT**: The user is learning Blazor and .NET. When implementing features:
+
+1. **Explain** what we're doing and why
+2. **Guide** through implementation steps
+3. **Don't** just provide code - teach the concepts
+4. **Ask** if clarification is needed
+5. **Reference** the detailed rule files when appropriate
+
+---
+
+## 📝 Naming Conventions Quick Reference
+
+| Item | Convention | Example |
+|------|------------|---------|
+| Classes | PascalCase | `DeveloperService` |
+| Interfaces | I + PascalCase | `IDeveloperService` |
+| Methods | PascalCase | `GetDeveloperAsync` |
+| Private fields | _camelCase | `_logger` |
+| Parameters | camelCase | `developerId` |
+| Properties | PascalCase | `DisplayName` |
+| Constants | PascalCase | `MaxRetryAttempts` |
+| Async methods | End with `Async` | `GetDeveloperAsync` |
+| DTOs | End with Dto/Request/Response | `DeveloperDto` |
+
+---
+
+## 🚀 Common Patterns
+
+### Repository Pattern
+```csharp
+public interface IRepository<T> where T : class
+{
+    Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<T> AddAsync(T entity, CancellationToken cancellationToken = default);
+}
+```
+
+### Unit of Work Pattern
+```csharp
+public interface IUnitOfWork : IDisposable
+{
+    IRepository<T> Repository<T>() where T : class;
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### Service Layer Pattern
+```csharp
+public class DeveloperService : IDeveloperService
+{
+    private readonly IUnitOfWork _unitOfWork;
+    
+    public async Task<DeveloperDto> GetDeveloperAsync(
+        Guid id, 
+        CancellationToken cancellationToken = default)
+    {
+        var developer = await _unitOfWork.Repository<Developer>()
+            .GetByIdAsync(id, cancellationToken);
+            
+        if (developer is null)
+        {
+            throw new NotFoundException($"Developer with ID {id} not found");
+        }
+        
+        return MapToDto(developer);
+    }
+}
+```
+
+---
+
+## ✅ Quality Standards
+
+### Code Quality
+- **Test Coverage**: 80% minimum
+- **Nullable Reference Types**: Enabled
+- **Warnings as Errors**: For nullable violations
+- **EditorConfig**: 4 spaces, file-scoped namespaces
+
+### Performance
+- Use `AsNoTracking()` for read-only queries
+- Implement pagination for large datasets
+- Use `ValueTask<T>` for hot paths
+- Batch database operations
+
+### Security
+- Never expose entities directly in APIs
+- Use DTOs for data transfer
+- Validate all inputs
+- Use parameterized queries (EF Core does this)
+
+---
+
+## 🚫 Anti-Patterns to Avoid
+
+❌ **DON'T**:
+- Reference outer layers from inner layers (breaks Clean Architecture)
+- Use synchronous database calls (`ToList()`, `First()`, etc.)
+- Expose domain entities through APIs (use DTOs)
+- Put business logic in controllers or Blazor components
+- Forget to dispose resources
+- Use magic strings for configuration
+- Create circular dependencies
+
+✅ **DO**:
+- Follow Clean Architecture dependency rules
+- Use async/await with CancellationToken
+- Use DTOs for API contracts
+- Keep business logic in Application layer services
+- Implement IDisposable/IAsyncDisposable
+- Use strongly-typed configuration
+- Keep dependencies flowing inward
+
+---
+
+## 🔍 Quick Decision Guide
+
+### "Where does this code go?"
+
+| What | Where | File |
+|------|-------|------|
+| Domain entity | Core/Entities | `Developer.cs` |
+| Repository interface | Core/Interfaces | `IDeveloperRepository.cs` |
+| Business logic | Application/Services | `DeveloperService.cs` |
+| Service interface | Application/Interfaces | `IDeveloperService.cs` |
+| DTO | Application/DTOs | `DeveloperDto.cs` |
+| EF configuration | Infrastructure/Data/Configurations | `DeveloperConfiguration.cs` |
+| Repository impl | Infrastructure/Repositories | `DeveloperRepository.cs` |
+| External API | Infrastructure/Services | `GitHubService.cs` |
+| Blazor component | Web/Components | `DeveloperCard.razor` |
+| API endpoint | Web/Controllers | `DevelopersController.cs` |
+| SignalR hub | Web/Hubs | `MetricsHub.cs` |
+
+### "Should I mock this?"
+
+| Component | Mock? | Why |
+|-----------|-------|-----|
+| Repository | ✅ Yes | External dependency |
+| Service | ✅ Yes | Business logic |
+| Logger | ✅ Yes | Infrastructure |
+| DbContext | ❌ No | Use in-memory database |
+| HTTP Client | ✅ Yes | External service |
+| Domain entity | ❌ No | Create real instances |
+
+---
+
+## 📚 Additional Resources
+
+For detailed rules on specific topics, see:
+- `.cursor/architecture.mdc` - Complete Clean Architecture guide
+- `.cursor/dotnet-conventions.mdc` - All C# and .NET conventions
+- `.cursor/blazor-rules.mdc` - Blazor patterns and best practices
+- `.cursor/database-rules.mdc` - EF Core and PostgreSQL guide
+- `.cursor/testing-rules.mdc` - Testing standards and patterns
+
+---
+
+## 🎯 Current Sprint
+
+**Sprint**: Sprint 0 (Setup & Preparation)  
+**Status**: Ready to begin  
+**Location**: `.ai/sprints/sprint0/`  
+**Next Steps**: Follow `sprint-plan.md` step-by-step
+
+---
+
+## 💡 Tips for AI Assistant
+
+1. **Check layer appropriateness** - Ensure code goes in the correct layer
+2. **Verify dependencies** - Dependencies must point inward only
+3. **Suggest async patterns** - Always use async/await with CancellationToken
+4. **Reference detailed rules** - Point to specific `.cursor/*.mdc` files for details
+5. **Teach, don't just code** - User is learning, so explain concepts
+6. **Follow sprint plan** - Reference `.ai/sprints/` for current tasks
+7. **Test as you go** - Remind to write tests for new code
+8. **Use DTOs** - Never expose entities directly in APIs
+
+---
+
+## 📞 When in Doubt
+
+1. Check the appropriate `.cursor/*.mdc` file for detailed rules
+2. Follow Clean Architecture principles (dependencies point inward)
+3. Use async/await everywhere
+4. Write tests for business logic
+5. Ask the user if clarification is needed
+
+---
+
+**Remember**: This is a learning project. Prioritize clear explanations and good practices over quick implementations.
+

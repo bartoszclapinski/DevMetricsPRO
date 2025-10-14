@@ -1,0 +1,1434 @@
+---
+alwaysApply: false
+---
+
+# Testing Standards for DevMetrics Pro
+
+## Testing Stack
+
+- **Unit Testing**: xUnit
+- **Assertions**: FluentAssertions
+- **Mocking**: Moq
+- **Integration Testing**: Microsoft.AspNetCore.Mvc.Testing
+- **Test Database**: In-Memory / Docker TestContainers
+
+## Testing Goals
+
+- **Target Coverage**: 80% minimum
+- **Focus**: Business logic (Application layer), domain logic (Core layer)
+- **Integration Tests**: Data access (Infrastructure), API endpoints (Web)
+
+## Test Project Structure
+
+```
+tests/
+├── DevMetricsPro.Core.Tests/
+│   ├── Entities/           # Domain entity tests
+│   ├── ValueObjects/       # Value object tests
+│   └── Specifications/     # Specification pattern tests
+├── DevMetricsPro.Application.Tests/
+│   ├── Services/          # Service tests (bulk of tests)
+│   ├── Validators/        # Validator tests
+│   └── Mappings/          # Mapping tests
+└── DevMetricsPro.Integration.Tests/
+    ├── Repositories/      # Repository integration tests
+    ├── Api/              # API endpoint tests
+    └── Infrastructure/    # Infrastructure tests
+```
+
+## Naming Conventions
+
+### Test Class Names
+✅ **Pattern**: `{ClassUnderTest}Tests`
+```csharp
+public class DeveloperServiceTests { }
+public class MetricCalculatorTests { }
+public class DeveloperRepositoryTests { }
+```
+
+### Test Method Names
+✅ **Pattern**: `MethodName_Scenario_ExpectedBehavior`
+```csharp
+[Fact]
+public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper() { }
+
+[Fact]
+public async Task GetDeveloperAsync_WithInvalidId_ThrowsNotFoundException() { }
+
+[Fact]
+public async Task CreateDeveloperAsync_WithDuplicateEmail_ThrowsValidationException() { }
+```
+
+## Test Structure: AAA Pattern
+
+### Arrange-Act-Assert
+✅ **ALWAYS use AAA pattern** with clear sections:
+```csharp
+[Fact]
+public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+{
+    // Arrange
+    var developerId = Guid.NewGuid();
+    var expected = new Developer
+    {
+        Id = developerId,
+        Email = "test@example.com",
+        DisplayName = "Test Developer"
+    };
+    
+    _mockRepository
+        .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(expected);
+    
+    var sut = new DeveloperService(_mockRepository.Object, _mockLogger.Object);
+
+    // Act
+    var result = await sut.GetDeveloperAsync(developerId);
+
+    // Assert
+    result.Should().NotBeNull();
+    result!.Id.Should().Be(developerId);
+    result.Email.Should().Be("test@example.com");
+}
+```
+
+## Unit Test Examples
+
+### Testing Services with Mocks
+```csharp
+using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Application.Services;
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Interfaces;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace DevMetricsPro.Application.Tests.Services;
+
+public class DeveloperServiceTests
+{
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<IRepository<Developer>> _mockRepository;
+    private readonly Mock<ILogger<DeveloperService>> _mockLogger;
+
+    public DeveloperServiceTests()
+    {
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
+        _mockRepository = new Mock<IRepository<Developer>>();
+        _mockLogger = new Mock<ILogger<DeveloperService>>();
+        
+        _mockUnitOfWork
+            .Setup(uow => uow.Repository<Developer>())
+            .Returns(_mockRepository.Object);
+    }
+
+    [Fact]
+    public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+    {
+        // Arrange
+        var developerId = Guid.NewGuid();
+        var developer = new Developer
+        {
+            Id = developerId,
+            Email = "test@example.com",
+            DisplayName = "Test Developer"
+        };
+        
+        _mockRepository
+            .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(developer);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        var result = await sut.GetDeveloperAsync(developerId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Email.Should().Be("test@example.com");
+        
+        // Verify mock was called
+        _mockRepository.Verify(
+            r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetDeveloperAsync_WithInvalidId_ThrowsNotFoundException()
+    {
+        // Arrange
+        var developerId = Guid.NewGuid();
+        
+        _mockRepository
+            .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Developer?)null);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        Func<Task> act = async () => await sut.GetDeveloperAsync(developerId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage($"Developer with ID {developerId} not found");
+    }
+
+    [Fact]
+    public async Task CreateDeveloperAsync_WithValidData_CreatesDeveloper()
+    {
+        // Arrange
+        var request = new CreateDeveloperRequest
+        {
+            Email = "new@example.com",
+            DisplayName = "New Developer"
+        };
+        
+        Developer? capturedDeveloper = null;
+        
+        _mockRepository
+            .Setup(r => r.AddAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()))
+            .Callback<Developer, CancellationToken>((dev, ct) => capturedDeveloper = dev)
+            .ReturnsAsync((Developer dev, CancellationToken ct) => dev);
+            
+        _mockUnitOfWork
+            .Setup(uow => uow.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        var result = await sut.CreateDeveloperAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Email.Should().Be(request.Email);
+        
+        capturedDeveloper.Should().NotBeNull();
+        capturedDeveloper!.Email.Should().Be(request.Email);
+        
+        _mockUnitOfWork.Verify(
+            uow => uow.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+}
+```
+
+### Testing with Test Data Builders
+✅ **Use builder pattern for complex test data**:
+```csharp
+public class DeveloperBuilder
+{
+    private Guid _id = Guid.NewGuid();
+    private string _email = "test@example.com";
+    private string _displayName = "Test Developer";
+    private string? _gitHubUsername;
+    
+    public DeveloperBuilder WithId(Guid id)
+    {
+        _id = id;
+        return this;
+    }
+    
+    public DeveloperBuilder WithEmail(string email)
+    {
+        _email = email;
+        return this;
+    }
+    
+    public DeveloperBuilder WithGitHubUsername(string username)
+    {
+        _gitHubUsername = username;
+        return this;
+    }
+    
+    public Developer Build() => new()
+    {
+        Id = _id,
+        Email = _email,
+        DisplayName = _displayName,
+        GitHubUsername = _gitHubUsername
+    };
+}
+
+// Usage
+var developer = new DeveloperBuilder()
+    .WithEmail("john@example.com")
+    .WithGitHubUsername("johndoe")
+    .Build();
+```
+
+## Integration Tests
+
+### Repository Integration Tests
+```csharp
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Infrastructure.Data;
+using DevMetricsPro.Infrastructure.Repositories;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+
+namespace DevMetricsPro.Integration.Tests.Repositories;
+
+public class DeveloperRepositoryTests : IDisposable
+{
+    private readonly ApplicationDbContext _context;
+    private readonly Repository<Developer> _repository;
+
+    public DeveloperRepositoryTests()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        _context = new ApplicationDbContext(options);
+        _repository = new Repository<Developer>(_context);
+    }
+
+    [Fact]
+    public async Task AddAsync_WithValidDeveloper_SavesDeveloperToDatabase()
+    {
+        // Arrange
+        var developer = new Developer
+        {
+            Email = "test@example.com",
+            DisplayName = "Test Developer"
+        };
+
+        // Act
+        await _repository.AddAsync(developer);
+        await _context.SaveChangesAsync();
+
+        // Assert
+        var saved = await _context.Developers
+            .FirstOrDefaultAsync(d => d.Email == "test@example.com");
+            
+        saved.Should().NotBeNull();
+        saved!.DisplayName.Should().Be("Test Developer");
+    }
+
+    [Fact]
+    public async Task FindAsync_WithPredicate_ReturnsMatchingDevelopers()
+    {
+        // Arrange
+        var developers = new[]
+        {
+            new Developer { Email = "alice@test.com", DisplayName = "Alice" },
+            new Developer { Email = "bob@test.com", DisplayName = "Bob" },
+            new Developer { Email = "charlie@example.com", DisplayName = "Charlie" }
+        };
+        
+        await _context.Developers.AddRangeAsync(developers);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var results = await _repository.FindAsync(d => d.Email.Contains("@test.com"));
+
+        // Assert
+        results.Should().HaveCount(2);
+        results.Should().Contain(d => d.DisplayName == "Alice");
+        results.Should().Contain(d => d.DisplayName == "Bob");
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+    }
+}
+```
+
+### API Integration Tests
+```csharp
+using DevMetricsPro.Application.DTOs.Auth;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using System.Net;
+using System.Net.Http.Json;
+
+namespace DevMetricsPro.Integration.Tests.Api;
+
+public class AuthControllerTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public AuthControllerTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task Register_WithValidData_ReturnsOk()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "newuser@example.com",
+            Password = "Test1234!",
+            ConfirmPassword = "Test1234!"
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        result.Should().NotBeNull();
+        result!.Token.Should().NotBeNullOrEmpty();
+        result.Email.Should().Be(request.Email);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidCredentials_ReturnsUnauthorized()
+    {
+        // Arrange
+        var request = new LoginRequest
+        {
+            Email = "nonexistent@example.com",
+            Password = "WrongPassword123!"
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+}
+```
+
+## FluentAssertions Best Practices
+
+### Object Assertions
+```csharp
+// Basic equality
+result.Should().Be(expected);
+result.Should().NotBe(unexpected);
+
+// Null checks
+result.Should().NotBeNull();
+result.Should().BeNull();
+
+// Type checks
+result.Should().BeOfType<Developer>();
+result.Should().BeAssignableTo<IEntity>();
+
+// Property assertions
+developer.Email.Should().Be("test@example.com");
+developer.Email.Should().StartWith("test");
+developer.Email.Should().EndWith("@example.com");
+developer.Email.Should().Contain("@");
+
+// Object comparison (by value)
+result.Should().BeEquivalentTo(expected);
+
+// Excluding properties
+result.Should().BeEquivalentTo(expected, options => 
+    options.Excluding(d => d.CreatedAt));
+```
+
+### Collection Assertions
+```csharp
+developers.Should().NotBeEmpty();
+developers.Should().HaveCount(5);
+developers.Should().HaveCountGreaterThan(3);
+developers.Should().Contain(d => d.Email == "test@example.com");
+developers.Should().NotContain(d => d.IsDeleted);
+developers.Should().AllSatisfy(d => d.Email.Should().Contain("@"));
+developers.Should().BeInAscendingOrder(d => d.DisplayName);
+```
+
+### Exception Assertions
+```csharp
+// Async exceptions
+Func<Task> act = async () => await service.GetDeveloperAsync(invalidId);
+await act.Should().ThrowAsync<NotFoundException>();
+
+// Exception with message
+await act.Should().ThrowAsync<NotFoundException>()
+    .WithMessage("*not found*");
+
+// Exception with specific property
+await act.Should().ThrowAsync<ValidationException>()
+    .Where(ex => ex.Errors.Count > 0);
+
+// No exception
+Func<Task> act = async () => await service.GetDeveloperAsync(validId);
+await act.Should().NotThrowAsync();
+```
+
+### DateTime Assertions
+```csharp
+developer.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+developer.CreatedAt.Should().BeBefore(DateTime.UtcNow);
+developer.CreatedAt.Should().BeAfter(startTime);
+```
+
+## Theory Tests with InlineData
+
+### Testing Multiple Inputs
+```csharp
+[Theory]
+[InlineData("test@example.com", true)]
+[InlineData("invalid-email", false)]
+[InlineData("", false)]
+[InlineData(null, false)]
+public void ValidateEmail_WithVariousInputs_ReturnsExpectedResult(
+    string? email, 
+    bool expectedValid)
+{
+    // Act
+    var result = _validator.ValidateEmail(email);
+
+    // Assert
+    result.Should().Be(expectedValid);
+}
+```
+
+### Testing with ClassData
+```csharp
+public class DeveloperTestData : IEnumerable<object[]>
+{
+    public IEnumerator<object[]> GetEnumerator()
+    {
+        yield return new object[] { "john@example.com", "John Doe", true };
+        yield return new object[] { "", "Jane", false };
+        yield return new object[] { "invalid", "Bob", false };
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+[Theory]
+[ClassData(typeof(DeveloperTestData))]
+public async Task CreateDeveloper_WithVariousData_ReturnsExpected(
+    string email,
+    string displayName,
+    bool shouldSucceed)
+{
+    // Test logic
+}
+```
+
+## Mocking Best Practices
+
+### Setup Mocks
+```csharp
+// Return value
+_mockRepository
+    .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+    .ReturnsAsync(developer);
+
+// Return different values based on input
+_mockRepository
+    .Setup(r => r.GetByIdAsync(validId, It.IsAny<CancellationToken>()))
+    .ReturnsAsync(developer);
+    
+_mockRepository
+    .Setup(r => r.GetByIdAsync(invalidId, It.IsAny<CancellationToken>()))
+    .ReturnsAsync((Developer?)null);
+
+// Throw exception
+_mockRepository
+    .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+    .ThrowsAsync(new DatabaseException());
+
+// Callback to capture arguments
+Developer? capturedDeveloper = null;
+_mockRepository
+    .Setup(r => r.AddAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()))
+    .Callback<Developer, CancellationToken>((dev, ct) => capturedDeveloper = dev)
+    .ReturnsAsync((Developer dev, CancellationToken ct) => dev);
+```
+
+### Verify Mock Calls
+```csharp
+// Verify method was called
+_mockRepository.Verify(
+    r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()),
+    Times.Once);
+
+// Verify method was never called
+_mockRepository.Verify(
+    r => r.DeleteAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()),
+    Times.Never);
+
+// Verify with specific parameter
+_mockRepository.Verify(
+    r => r.AddAsync(It.Is<Developer>(d => d.Email == "test@example.com"), It.IsAny<CancellationToken>()),
+    Times.Once);
+```
+
+## Test Organization
+
+### Base Test Classes
+```csharp
+public abstract class ServiceTestBase
+{
+    protected readonly Mock<ILogger> MockLogger;
+    
+    protected ServiceTestBase()
+    {
+        MockLogger = new Mock<ILogger>();
+    }
+}
+
+public class DeveloperServiceTests : ServiceTestBase
+{
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    
+    public DeveloperServiceTests()
+    {
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
+    }
+}
+```
+
+### Shared Test Fixtures
+```csharp
+public class DatabaseFixture : IDisposable
+{
+    public ApplicationDbContext Context { get; }
+
+    public DatabaseFixture()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+            
+        Context = new ApplicationDbContext(options);
+    }
+
+    public void Dispose()
+    {
+        Context.Dispose();
+    }
+}
+
+public class RepositoryTests : IClassFixture<DatabaseFixture>
+{
+    private readonly ApplicationDbContext _context;
+
+    public RepositoryTests(DatabaseFixture fixture)
+    {
+        _context = fixture.Context;
+    }
+}
+```
+
+## Performance Testing
+
+### Testing Query Performance
+```csharp
+[Fact]
+public async Task GetDevelopersWithCommits_WithLargeDataset_CompletesInReasonableTime()
+{
+    // Arrange
+    var developers = Enumerable.Range(1, 1000)
+        .Select(i => new Developer { Email = $"dev{i}@example.com" })
+        .ToList();
+        
+    await _context.Developers.AddRangeAsync(developers);
+    await _context.SaveChangesAsync();
+    
+    var stopwatch = Stopwatch.StartNew();
+
+    // Act
+    var results = await _repository.GetDevelopersWithCommitsAsync();
+    
+    stopwatch.Stop();
+
+    // Assert
+    results.Should().HaveCount(1000);
+    stopwatch.ElapsedMilliseconds.Should().BeLessThan(500); // 500ms max
+}
+```
+
+## Coverage Requirements
+
+### Minimum Coverage by Layer:
+- **Core (Entities, Value Objects)**: 90%
+- **Application (Services)**: 80%
+- **Infrastructure (Repositories)**: 70%
+- **Web (Controllers, Components)**: 60%
+
+### What NOT to Test:
+- Auto-properties
+- Simple DTOs without logic
+- Third-party library code
+- Framework code
+- Generated code (migrations)
+
+### Focus Testing On:
+- Business logic
+- Validation logic
+- Data transformations
+- Error handling
+- Edge cases
+- Complex queries
+
+## Test Data Management
+
+### Create Test Data Helpers
+```csharp
+public static class TestData
+{
+    public static Developer CreateDeveloper(
+        string? email = null,
+        string? displayName = null)
+    {
+        return new Developer
+        {
+            Email = email ?? $"test{Guid.NewGuid():N}@example.com",
+            DisplayName = displayName ?? "Test Developer"
+        };
+    }
+    
+    public static List<Commit> CreateCommits(
+        Developer developer, 
+        int count = 5)
+    {
+        return Enumerable.Range(1, count)
+            .Select(i => new Commit
+            {
+                DeveloperId = developer.Id,
+                Sha = Guid.NewGuid().ToString("N"),
+                Message = $"Commit {i}",
+                CommittedAt = DateTime.UtcNow.AddDays(-i)
+            })
+            .ToList();
+    }
+}
+```
+
+## Quick Checklist
+
+Before committing tests:
+- [ ] Test name follows pattern (Method_Scenario_Expected)
+- [ ] AAA pattern used (Arrange-Act-Assert)
+- [ ] FluentAssertions used for assertions
+- [ ] Mocks verified where appropriate
+- [ ] Tests are isolated (no shared state)
+- [ ] Test data is clear and minimal
+- [ ] Edge cases covered
+- [ ] Happy path tested
+- [ ] Error cases tested
+- [ ] Async methods tested properly
+- [ ] Tests are fast (<100ms for unit tests)
+- [ ] Code coverage meets minimum (80%)
+# Testing Standards for DevMetrics Pro
+
+## Testing Stack
+
+- **Unit Testing**: xUnit
+- **Assertions**: FluentAssertions
+- **Mocking**: Moq
+- **Integration Testing**: Microsoft.AspNetCore.Mvc.Testing
+- **Test Database**: In-Memory / Docker TestContainers
+
+## Testing Goals
+
+- **Target Coverage**: 80% minimum
+- **Focus**: Business logic (Application layer), domain logic (Core layer)
+- **Integration Tests**: Data access (Infrastructure), API endpoints (Web)
+
+## Test Project Structure
+
+```
+tests/
+├── DevMetricsPro.Core.Tests/
+│   ├── Entities/           # Domain entity tests
+│   ├── ValueObjects/       # Value object tests
+│   └── Specifications/     # Specification pattern tests
+├── DevMetricsPro.Application.Tests/
+│   ├── Services/          # Service tests (bulk of tests)
+│   ├── Validators/        # Validator tests
+│   └── Mappings/          # Mapping tests
+└── DevMetricsPro.Integration.Tests/
+    ├── Repositories/      # Repository integration tests
+    ├── Api/              # API endpoint tests
+    └── Infrastructure/    # Infrastructure tests
+```
+
+## Naming Conventions
+
+### Test Class Names
+✅ **Pattern**: `{ClassUnderTest}Tests`
+```csharp
+public class DeveloperServiceTests { }
+public class MetricCalculatorTests { }
+public class DeveloperRepositoryTests { }
+```
+
+### Test Method Names
+✅ **Pattern**: `MethodName_Scenario_ExpectedBehavior`
+```csharp
+[Fact]
+public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper() { }
+
+[Fact]
+public async Task GetDeveloperAsync_WithInvalidId_ThrowsNotFoundException() { }
+
+[Fact]
+public async Task CreateDeveloperAsync_WithDuplicateEmail_ThrowsValidationException() { }
+```
+
+## Test Structure: AAA Pattern
+
+### Arrange-Act-Assert
+✅ **ALWAYS use AAA pattern** with clear sections:
+```csharp
+[Fact]
+public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+{
+    // Arrange
+    var developerId = Guid.NewGuid();
+    var expected = new Developer
+    {
+        Id = developerId,
+        Email = "test@example.com",
+        DisplayName = "Test Developer"
+    };
+    
+    _mockRepository
+        .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(expected);
+    
+    var sut = new DeveloperService(_mockRepository.Object, _mockLogger.Object);
+
+    // Act
+    var result = await sut.GetDeveloperAsync(developerId);
+
+    // Assert
+    result.Should().NotBeNull();
+    result!.Id.Should().Be(developerId);
+    result.Email.Should().Be("test@example.com");
+}
+```
+
+## Unit Test Examples
+
+### Testing Services with Mocks
+```csharp
+using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Application.Services;
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Interfaces;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace DevMetricsPro.Application.Tests.Services;
+
+public class DeveloperServiceTests
+{
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<IRepository<Developer>> _mockRepository;
+    private readonly Mock<ILogger<DeveloperService>> _mockLogger;
+
+    public DeveloperServiceTests()
+    {
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
+        _mockRepository = new Mock<IRepository<Developer>>();
+        _mockLogger = new Mock<ILogger<DeveloperService>>();
+        
+        _mockUnitOfWork
+            .Setup(uow => uow.Repository<Developer>())
+            .Returns(_mockRepository.Object);
+    }
+
+    [Fact]
+    public async Task GetDeveloperAsync_WithValidId_ReturnsDeveloper()
+    {
+        // Arrange
+        var developerId = Guid.NewGuid();
+        var developer = new Developer
+        {
+            Id = developerId,
+            Email = "test@example.com",
+            DisplayName = "Test Developer"
+        };
+        
+        _mockRepository
+            .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(developer);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        var result = await sut.GetDeveloperAsync(developerId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Email.Should().Be("test@example.com");
+        
+        // Verify mock was called
+        _mockRepository.Verify(
+            r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetDeveloperAsync_WithInvalidId_ThrowsNotFoundException()
+    {
+        // Arrange
+        var developerId = Guid.NewGuid();
+        
+        _mockRepository
+            .Setup(r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Developer?)null);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        Func<Task> act = async () => await sut.GetDeveloperAsync(developerId);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage($"Developer with ID {developerId} not found");
+    }
+
+    [Fact]
+    public async Task CreateDeveloperAsync_WithValidData_CreatesDeveloper()
+    {
+        // Arrange
+        var request = new CreateDeveloperRequest
+        {
+            Email = "new@example.com",
+            DisplayName = "New Developer"
+        };
+        
+        Developer? capturedDeveloper = null;
+        
+        _mockRepository
+            .Setup(r => r.AddAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()))
+            .Callback<Developer, CancellationToken>((dev, ct) => capturedDeveloper = dev)
+            .ReturnsAsync((Developer dev, CancellationToken ct) => dev);
+            
+        _mockUnitOfWork
+            .Setup(uow => uow.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        
+        var sut = new DeveloperService(_mockUnitOfWork.Object, _mockLogger.Object);
+
+        // Act
+        var result = await sut.CreateDeveloperAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Email.Should().Be(request.Email);
+        
+        capturedDeveloper.Should().NotBeNull();
+        capturedDeveloper!.Email.Should().Be(request.Email);
+        
+        _mockUnitOfWork.Verify(
+            uow => uow.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+}
+```
+
+### Testing with Test Data Builders
+✅ **Use builder pattern for complex test data**:
+```csharp
+public class DeveloperBuilder
+{
+    private Guid _id = Guid.NewGuid();
+    private string _email = "test@example.com";
+    private string _displayName = "Test Developer";
+    private string? _gitHubUsername;
+    
+    public DeveloperBuilder WithId(Guid id)
+    {
+        _id = id;
+        return this;
+    }
+    
+    public DeveloperBuilder WithEmail(string email)
+    {
+        _email = email;
+        return this;
+    }
+    
+    public DeveloperBuilder WithGitHubUsername(string username)
+    {
+        _gitHubUsername = username;
+        return this;
+    }
+    
+    public Developer Build() => new()
+    {
+        Id = _id,
+        Email = _email,
+        DisplayName = _displayName,
+        GitHubUsername = _gitHubUsername
+    };
+}
+
+// Usage
+var developer = new DeveloperBuilder()
+    .WithEmail("john@example.com")
+    .WithGitHubUsername("johndoe")
+    .Build();
+```
+
+## Integration Tests
+
+### Repository Integration Tests
+```csharp
+using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Infrastructure.Data;
+using DevMetricsPro.Infrastructure.Repositories;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+
+namespace DevMetricsPro.Integration.Tests.Repositories;
+
+public class DeveloperRepositoryTests : IDisposable
+{
+    private readonly ApplicationDbContext _context;
+    private readonly Repository<Developer> _repository;
+
+    public DeveloperRepositoryTests()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        _context = new ApplicationDbContext(options);
+        _repository = new Repository<Developer>(_context);
+    }
+
+    [Fact]
+    public async Task AddAsync_WithValidDeveloper_SavesDeveloperToDatabase()
+    {
+        // Arrange
+        var developer = new Developer
+        {
+            Email = "test@example.com",
+            DisplayName = "Test Developer"
+        };
+
+        // Act
+        await _repository.AddAsync(developer);
+        await _context.SaveChangesAsync();
+
+        // Assert
+        var saved = await _context.Developers
+            .FirstOrDefaultAsync(d => d.Email == "test@example.com");
+            
+        saved.Should().NotBeNull();
+        saved!.DisplayName.Should().Be("Test Developer");
+    }
+
+    [Fact]
+    public async Task FindAsync_WithPredicate_ReturnsMatchingDevelopers()
+    {
+        // Arrange
+        var developers = new[]
+        {
+            new Developer { Email = "alice@test.com", DisplayName = "Alice" },
+            new Developer { Email = "bob@test.com", DisplayName = "Bob" },
+            new Developer { Email = "charlie@example.com", DisplayName = "Charlie" }
+        };
+        
+        await _context.Developers.AddRangeAsync(developers);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var results = await _repository.FindAsync(d => d.Email.Contains("@test.com"));
+
+        // Assert
+        results.Should().HaveCount(2);
+        results.Should().Contain(d => d.DisplayName == "Alice");
+        results.Should().Contain(d => d.DisplayName == "Bob");
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+    }
+}
+```
+
+### API Integration Tests
+```csharp
+using DevMetricsPro.Application.DTOs.Auth;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using System.Net;
+using System.Net.Http.Json;
+
+namespace DevMetricsPro.Integration.Tests.Api;
+
+public class AuthControllerTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public AuthControllerTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task Register_WithValidData_ReturnsOk()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            Email = "newuser@example.com",
+            Password = "Test1234!",
+            ConfirmPassword = "Test1234!"
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        result.Should().NotBeNull();
+        result!.Token.Should().NotBeNullOrEmpty();
+        result.Email.Should().Be(request.Email);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidCredentials_ReturnsUnauthorized()
+    {
+        // Arrange
+        var request = new LoginRequest
+        {
+            Email = "nonexistent@example.com",
+            Password = "WrongPassword123!"
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+}
+```
+
+## FluentAssertions Best Practices
+
+### Object Assertions
+```csharp
+// Basic equality
+result.Should().Be(expected);
+result.Should().NotBe(unexpected);
+
+// Null checks
+result.Should().NotBeNull();
+result.Should().BeNull();
+
+// Type checks
+result.Should().BeOfType<Developer>();
+result.Should().BeAssignableTo<IEntity>();
+
+// Property assertions
+developer.Email.Should().Be("test@example.com");
+developer.Email.Should().StartWith("test");
+developer.Email.Should().EndWith("@example.com");
+developer.Email.Should().Contain("@");
+
+// Object comparison (by value)
+result.Should().BeEquivalentTo(expected);
+
+// Excluding properties
+result.Should().BeEquivalentTo(expected, options => 
+    options.Excluding(d => d.CreatedAt));
+```
+
+### Collection Assertions
+```csharp
+developers.Should().NotBeEmpty();
+developers.Should().HaveCount(5);
+developers.Should().HaveCountGreaterThan(3);
+developers.Should().Contain(d => d.Email == "test@example.com");
+developers.Should().NotContain(d => d.IsDeleted);
+developers.Should().AllSatisfy(d => d.Email.Should().Contain("@"));
+developers.Should().BeInAscendingOrder(d => d.DisplayName);
+```
+
+### Exception Assertions
+```csharp
+// Async exceptions
+Func<Task> act = async () => await service.GetDeveloperAsync(invalidId);
+await act.Should().ThrowAsync<NotFoundException>();
+
+// Exception with message
+await act.Should().ThrowAsync<NotFoundException>()
+    .WithMessage("*not found*");
+
+// Exception with specific property
+await act.Should().ThrowAsync<ValidationException>()
+    .Where(ex => ex.Errors.Count > 0);
+
+// No exception
+Func<Task> act = async () => await service.GetDeveloperAsync(validId);
+await act.Should().NotThrowAsync();
+```
+
+### DateTime Assertions
+```csharp
+developer.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+developer.CreatedAt.Should().BeBefore(DateTime.UtcNow);
+developer.CreatedAt.Should().BeAfter(startTime);
+```
+
+## Theory Tests with InlineData
+
+### Testing Multiple Inputs
+```csharp
+[Theory]
+[InlineData("test@example.com", true)]
+[InlineData("invalid-email", false)]
+[InlineData("", false)]
+[InlineData(null, false)]
+public void ValidateEmail_WithVariousInputs_ReturnsExpectedResult(
+    string? email, 
+    bool expectedValid)
+{
+    // Act
+    var result = _validator.ValidateEmail(email);
+
+    // Assert
+    result.Should().Be(expectedValid);
+}
+```
+
+### Testing with ClassData
+```csharp
+public class DeveloperTestData : IEnumerable<object[]>
+{
+    public IEnumerator<object[]> GetEnumerator()
+    {
+        yield return new object[] { "john@example.com", "John Doe", true };
+        yield return new object[] { "", "Jane", false };
+        yield return new object[] { "invalid", "Bob", false };
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+[Theory]
+[ClassData(typeof(DeveloperTestData))]
+public async Task CreateDeveloper_WithVariousData_ReturnsExpected(
+    string email,
+    string displayName,
+    bool shouldSucceed)
+{
+    // Test logic
+}
+```
+
+## Mocking Best Practices
+
+### Setup Mocks
+```csharp
+// Return value
+_mockRepository
+    .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+    .ReturnsAsync(developer);
+
+// Return different values based on input
+_mockRepository
+    .Setup(r => r.GetByIdAsync(validId, It.IsAny<CancellationToken>()))
+    .ReturnsAsync(developer);
+    
+_mockRepository
+    .Setup(r => r.GetByIdAsync(invalidId, It.IsAny<CancellationToken>()))
+    .ReturnsAsync((Developer?)null);
+
+// Throw exception
+_mockRepository
+    .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+    .ThrowsAsync(new DatabaseException());
+
+// Callback to capture arguments
+Developer? capturedDeveloper = null;
+_mockRepository
+    .Setup(r => r.AddAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()))
+    .Callback<Developer, CancellationToken>((dev, ct) => capturedDeveloper = dev)
+    .ReturnsAsync((Developer dev, CancellationToken ct) => dev);
+```
+
+### Verify Mock Calls
+```csharp
+// Verify method was called
+_mockRepository.Verify(
+    r => r.GetByIdAsync(developerId, It.IsAny<CancellationToken>()),
+    Times.Once);
+
+// Verify method was never called
+_mockRepository.Verify(
+    r => r.DeleteAsync(It.IsAny<Developer>(), It.IsAny<CancellationToken>()),
+    Times.Never);
+
+// Verify with specific parameter
+_mockRepository.Verify(
+    r => r.AddAsync(It.Is<Developer>(d => d.Email == "test@example.com"), It.IsAny<CancellationToken>()),
+    Times.Once);
+```
+
+## Test Organization
+
+### Base Test Classes
+```csharp
+public abstract class ServiceTestBase
+{
+    protected readonly Mock<ILogger> MockLogger;
+    
+    protected ServiceTestBase()
+    {
+        MockLogger = new Mock<ILogger>();
+    }
+}
+
+public class DeveloperServiceTests : ServiceTestBase
+{
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    
+    public DeveloperServiceTests()
+    {
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
+    }
+}
+```
+
+### Shared Test Fixtures
+```csharp
+public class DatabaseFixture : IDisposable
+{
+    public ApplicationDbContext Context { get; }
+
+    public DatabaseFixture()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+            
+        Context = new ApplicationDbContext(options);
+    }
+
+    public void Dispose()
+    {
+        Context.Dispose();
+    }
+}
+
+public class RepositoryTests : IClassFixture<DatabaseFixture>
+{
+    private readonly ApplicationDbContext _context;
+
+    public RepositoryTests(DatabaseFixture fixture)
+    {
+        _context = fixture.Context;
+    }
+}
+```
+
+## Performance Testing
+
+### Testing Query Performance
+```csharp
+[Fact]
+public async Task GetDevelopersWithCommits_WithLargeDataset_CompletesInReasonableTime()
+{
+    // Arrange
+    var developers = Enumerable.Range(1, 1000)
+        .Select(i => new Developer { Email = $"dev{i}@example.com" })
+        .ToList();
+        
+    await _context.Developers.AddRangeAsync(developers);
+    await _context.SaveChangesAsync();
+    
+    var stopwatch = Stopwatch.StartNew();
+
+    // Act
+    var results = await _repository.GetDevelopersWithCommitsAsync();
+    
+    stopwatch.Stop();
+
+    // Assert
+    results.Should().HaveCount(1000);
+    stopwatch.ElapsedMilliseconds.Should().BeLessThan(500); // 500ms max
+}
+```
+
+## Coverage Requirements
+
+### Minimum Coverage by Layer:
+- **Core (Entities, Value Objects)**: 90%
+- **Application (Services)**: 80%
+- **Infrastructure (Repositories)**: 70%
+- **Web (Controllers, Components)**: 60%
+
+### What NOT to Test:
+- Auto-properties
+- Simple DTOs without logic
+- Third-party library code
+- Framework code
+- Generated code (migrations)
+
+### Focus Testing On:
+- Business logic
+- Validation logic
+- Data transformations
+- Error handling
+- Edge cases
+- Complex queries
+
+## Test Data Management
+
+### Create Test Data Helpers
+```csharp
+public static class TestData
+{
+    public static Developer CreateDeveloper(
+        string? email = null,
+        string? displayName = null)
+    {
+        return new Developer
+        {
+            Email = email ?? $"test{Guid.NewGuid():N}@example.com",
+            DisplayName = displayName ?? "Test Developer"
+        };
+    }
+    
+    public static List<Commit> CreateCommits(
+        Developer developer, 
+        int count = 5)
+    {
+        return Enumerable.Range(1, count)
+            .Select(i => new Commit
+            {
+                DeveloperId = developer.Id,
+                Sha = Guid.NewGuid().ToString("N"),
+                Message = $"Commit {i}",
+                CommittedAt = DateTime.UtcNow.AddDays(-i)
+            })
+            .ToList();
+    }
+}
+```
+
+## Quick Checklist
+
+Before committing tests:
+- [ ] Test name follows pattern (Method_Scenario_Expected)
+- [ ] AAA pattern used (Arrange-Act-Assert)
+- [ ] FluentAssertions used for assertions
+- [ ] Mocks verified where appropriate
+- [ ] Tests are isolated (no shared state)
+- [ ] Test data is clear and minimal
+- [ ] Edge cases covered
+- [ ] Happy path tested
+- [ ] Error cases tested
+- [ ] Async methods tested properly
+- [ ] Tests are fast (<100ms for unit tests)
+- [ ] Code coverage meets minimum (80%)
