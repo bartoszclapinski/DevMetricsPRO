@@ -1,0 +1,56 @@
+# Auto-labeling configuration for PRs based on changed files
+
+'documentation':
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.md'
+      - '.ai/**/*'
+
+'infrastructure':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/**/Infrastructure/**/*'
+      - 'docker-compose*.yml'
+      - '.github/**/*'
+
+'core':
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/Core/**/*'
+
+'application':
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/Application/**/*'
+
+'web':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/**/Web/**/*'
+      - '**/*.razor'
+
+'tests':
+  - changed-files:
+    - any-glob-to-any-file: 
+      - 'tests/**/*'
+      - '**/*Tests.cs'
+
+'dependencies':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/packages.lock.json'
+      - '**/*.csproj'
+
+'database':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/Migrations/**/*'
+      - '**/Data/**/*'
+
+'configuration':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '.editorconfig'
+      - '.cursorrules'
+
