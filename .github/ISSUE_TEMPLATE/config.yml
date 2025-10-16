@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/bartoszclapinski/DevMetricsPRO/tree/master/.ai
+    about: Check project documentation, PRD, and sprint plans
+  - name: 💬 Discussions
+    url: https://github.com/bartoszclapinski/DevMetricsPRO/discussions
+    about: Ask questions and discuss ideas with the community
+
