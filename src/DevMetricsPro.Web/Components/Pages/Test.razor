@@ -1,0 +1,99 @@
+@page "/test"
+@rendermode InteractiveServer
+@using DevMetricsPro.Infrastructure.Data
+@using DevMetricsPro.Core.Entities
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Test Page - DevMetrics Pro</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h3" Class="mb-4">🎉 DevMetrics Pro - Sprint 0 Complete!</MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h5" Class="mb-2">✅ MudBlazor is Working!</MudText>
+        <MudText>If you can see this beautiful Material Design card, MudBlazor is configured correctly!</MudText>
+        
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">
+            Test Button
+        </MudButton>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h5" Class="mb-2">🐘 Database Connection</MudText>
+        <MudText>Developers in database: @developers.Count</MudText>
+        
+        @if (developers.Any())
+        {
+            <MudSimpleTable Class="mt-4">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>GitHub</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var dev in developers)
+                    {
+                        <tr>
+                            <td>@dev.Name</td>
+                            <td>@dev.Email</td>
+                            <td>@(dev.GitHubUsername ?? "N/A")</td>
+                            <td>@dev.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-2">No developers yet. Click button to add test data!</MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" Class="mt-2" OnClick="AddTestData">
+                Add Test Developer
+            </MudButton>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h5" Class="mb-2">📊 Sprint 0 Status</MudText>
+        <MudText>✅ Docker containers running</MudText>
+        <MudText>✅ PostgreSQL database connected</MudText>
+        <MudText>✅ Entity Framework Core working</MudText>
+        <MudText>✅ MudBlazor components rendering</MudText>
+        <MudText>✅ Clean Architecture implemented</MudText>
+        <MudText Class="mt-2" Typo="Typo.h6" Color="Color.Success">🎉 Sprint 0 - 100% COMPLETE!</MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<Developer> developers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load developers from database
+        developers = await DbContext.Developers.ToListAsync();
+    }
+
+    private async Task AddTestData()
+    {
+        var developer = new Developer
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Developer",
+            Email = "test@devmetrics.pro",
+            GitHubUsername = "testdev",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        DbContext.Developers.Add(developer);
+        await DbContext.SaveChangesAsync();
+
+        // Reload data
+        developers = await DbContext.Developers.ToListAsync();
+
+        // Tell Blazor to refresh the UI
+        StateHasChanged();
+    }
+}
