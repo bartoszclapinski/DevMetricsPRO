@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevMetricsPro.Infrastructure\DevMetricsPro.Infrastructure.csproj" />
+    <ProjectReference Include="..\DevMetricsPro.Application\DevMetricsPro.Application.csproj" />
+    <ProjectReference Include="..\DevMetricsPro.Core\DevMetricsPro.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
