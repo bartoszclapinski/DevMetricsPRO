@@ -11,7 +11,7 @@
 
 DevMetrics Pro is a comprehensive developer analytics platform that provides real-time insights into team productivity, code quality, and project health. It integrates with popular development tools to give you a unified view of your team's performance.
 
-## 🎨 What We're Building
+## 🎨 What DevMetrics Pro is about
 
 ![DevMetrics Pro Dashboard](.ai/design/design-prototype-ss.png)
 
