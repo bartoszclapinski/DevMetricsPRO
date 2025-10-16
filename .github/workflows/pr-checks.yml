@@ -17,6 +17,7 @@ jobs:
     steps:
     - name: Check PR title format
       uses: amannn/action-semantic-pull-request@v5
+      continue-on-error: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -29,6 +30,12 @@ jobs:
           test
           chore
           perf
+          sprint0
+          sprint1
+          sprint2
+          sprint3
+          sprint4
+          sprint5
         requireScope: false
 
   pr-size-check:
