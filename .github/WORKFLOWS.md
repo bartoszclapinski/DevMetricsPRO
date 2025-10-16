@@ -1,4 +1,7 @@
-# GitHub Actions CI/CD
+# GitHub Actions & CI/CD Workflows
+
+> **📖 Documentation for CI/CD workflows and automation**  
+> For the main project README, see: [../README.md](../README.md)
 
 This folder contains automated workflows for continuous integration and deployment.
 
