@@ -90,6 +90,20 @@ Core (Domain)
 
 ---
 
+### Documentation Updates ✅
+**Date:** October 16, 2025
+
+**What we did:**
+- ✅ Created comprehensive Sprint 0 log
+- ✅ Simplified PR template to checkbox-only (no manual filling!)
+- ✅ GitHub now auto-fills PR descriptions from commits
+
+**Commits:**
+- `docs(sprint0): add sprint log and simplify PR template`
+- `refactor: simplify PR template to checkbox-only`
+
+---
+
 ## 📝 Remaining Phases
 
 ### Phase 5: Database Context & Migrations ⏳
