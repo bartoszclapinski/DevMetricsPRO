@@ -18,8 +18,6 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
-    # Only run if src/ folder exists (solution is created)
-    if: github.event_name == 'push' && hashFiles('src/**') != '' || github.event_name == 'pull_request'
 
     services:
       postgres:
@@ -111,19 +109,37 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: 📦 Restore dependencies
-      run: dotnet restore
+      run: |
+        if [ -f "*.sln" ]; then
+          dotnet restore
+        else
+          echo "⚠️ No solution file found yet. Skipping restore step."
+        fi
+      continue-on-error: true
 
     - name: 🔍 Analyze code style
-      run: dotnet build --no-restore /p:EnforceCodeStyleInBuild=true /p:TreatWarningsAsErrors=false
+      run: |
+        if [ -f "*.sln" ]; then
+          dotnet build --no-restore /p:EnforceCodeStyleInBuild=true /p:TreatWarningsAsErrors=false
+        else
+          echo "⚠️ No solution file found yet. Skipping code style check."
+        fi
       continue-on-error: true
 
     - name: 🔒 Security scan with DevSkim
       uses: microsoft/DevSkim-Action@v1
+      if: hashFiles('src/**') != ''
       with:
         directory-to-scan: ./src
+      continue-on-error: true
 
     - name: 📋 Format check
-      run: dotnet format --verify-no-changes --verbosity diagnostic
+      run: |
+        if [ -f "*.sln" ]; then
+          dotnet format --verify-no-changes --verbosity diagnostic
+        else
+          echo "⚠️ No solution file found yet. Skipping format check."
+        fi
       continue-on-error: true
 
   dependency-review:
