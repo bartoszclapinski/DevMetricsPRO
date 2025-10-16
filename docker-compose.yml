@@ -1,0 +1,54 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: devmetrics-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devmetrics
+      POSTGRES_PASSWORD: DevMetrics2024!
+      POSTGRES_DB: devmetrics_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devmetrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devmetrics-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: devmetrics-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devmetrics-network
+
+# Persistent storage volumes
+volumes:
+  postgres_data:
+    name: devmetrics-postgres-data
+  redis_data:
+    name: devmetrics-redis-data
+
+# Network for services to communicate
+networks:
+  devmetrics-network:
+    name: devmetrics-network
+    driver: bridge
+
