@@ -18,8 +18,11 @@ Solid foundation with domain entities, database, authentication, and basic UI
 ### Day 1 - October 17, 2025
 **Phases completed**:
 - [x] Phase 1.1: Core Domain Entities ✅
+- [x] Phase 1.2: Infrastructure - Database Setup ✅
 
 **What I learned**:
+
+**Phase 1.1 - Core Domain Entities:**
 - Created BaseEntity abstract class with common properties (Id, CreatedAt, UpdatedAt, IsDeleted)
 - Created enums for MetricType, PlatformType, and PullRequestStatus
 - Created all domain entities: Developer, Repository, Commit, PullRequest, Metric
@@ -28,20 +31,34 @@ Solid foundation with domain entities, database, authentication, and basic UI
 - Learned about CancellationToken for cancelling async operations
 - Learned about Expression<Func<T, bool>> for flexible LINQ queries
 
-**Time spent**: ~2 hours  
+**Phase 1.2 - Infrastructure & Database:**
+- Created entity configurations using IEntityTypeConfiguration<T> for all 5 entities
+- Used Fluent API to configure properties, constraints, and relationships
+- Learned about `.HasMaxLength()`, `.IsRequired()`, `.HasConversion<string>()` for enums
+- Configured indexes for better query performance (unique, composite, and regular indexes)
+- Set up foreign key relationships with CASCADE delete behavior
+- Configured many-to-many relationship between Developer and Repository
+- Used `ApplyConfigurationsFromAssembly()` to auto-load all configurations
+- Created comprehensive migration with `dotnet ef migrations add InitialDatabaseSchema`
+- Applied migration to PostgreSQL database with `dotnet ef database update`
+- Verified all 6 tables created: Developers, Repositories, Commits, PullRequests, Metrics, DeveloperRepository
+- All indexes and foreign keys properly created in PostgreSQL
+
+**Time spent**: ~3 hours  
 **Blockers**: None  
 **Notes**: 
 - Core layer is complete and builds successfully! All entities follow Clean Architecture principles.
-- Created feature branch: `feature/sprint1-phase1.1-core-entities`
-- Committed changes with conventional commit message
-- Pushed to GitHub and created PR to close issue #20
-- Following professional git workflow: feature branch → commit → push → PR → merge 
+- Database schema fully configured with proper relationships, indexes, and constraints
+- Created feature branch for Phase 1.1: `feature/sprint1-phase1.1-core-entities` → Merged via PR #20
+- Created feature branch for Phase 1.2: `sprint1/phase1.2-infrastructure-database-#21`
+- Following professional git workflow: feature branch → commit → push → PR → merge
+- Issue-driven development: Each phase has a GitHub issue
 
 ---
 
 ### Day 2 - __________
 **Phases completed**:
-- [ ] Phase 1.2: Infrastructure - Database Setup
+- [ ] Phase 1.3: Repository Pattern Implementation
 
 **What I learned**:
 - 
@@ -200,9 +217,9 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ## ✅ Sprint Success Criteria
 
-- [ ] Core domain entities implemented
-- [ ] Entity Framework Core configured
-- [ ] Database migrations working
+- [x] Core domain entities implemented
+- [x] Entity Framework Core configured
+- [x] Database migrations working
 - [ ] Repository pattern with Unit of Work
 - [ ] ASP.NET Core Identity setup
 - [ ] JWT authentication functional
