@@ -30,7 +30,12 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 **Time spent**: ~2 hours  
 **Blockers**: None  
-**Notes**: Core layer is complete and builds successfully! All entities follow Clean Architecture principles. 
+**Notes**: 
+- Core layer is complete and builds successfully! All entities follow Clean Architecture principles.
+- Created feature branch: `feature/sprint1-phase1.1-core-entities`
+- Committed changes with conventional commit message
+- Pushed to GitHub and created PR to close issue #20
+- Following professional git workflow: feature branch → commit → push → PR → merge 
 
 ---
 
