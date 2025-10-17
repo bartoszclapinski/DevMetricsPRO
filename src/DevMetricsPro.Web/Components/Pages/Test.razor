@@ -38,7 +38,7 @@
                     @foreach (var dev in developers)
                     {
                         <tr>
-                            <td>@dev.Name</td>
+                            <td>@dev.DisplayName</td>
                             <td>@dev.Email</td>
                             <td>@(dev.GitHubUsername ?? "N/A")</td>
                             <td>@dev.CreatedAt.ToString("yyyy-MM-dd")</td>
@@ -81,7 +81,7 @@
         var developer = new Developer
         {
             Id = Guid.NewGuid(),
-            Name = "Test Developer",
+            DisplayName = "Test Developer",
             Email = "test@devmetrics.pro",
             GitHubUsername = "testdev",
             CreatedAt = DateTime.UtcNow
