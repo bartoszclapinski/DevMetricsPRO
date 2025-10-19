@@ -73,17 +73,42 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ---
 
-### Day 2 - __________
+### Day 2 - October 19, 2025
 **Phases completed**:
-- [ ] Phase 1.4: Logging & Error Handling
+- [x] Phase 1.4: Logging & Error Handling ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 1.4 - Logging & Error Handling:**
+- Updated `dotnet ef` tools from version 8.0.10 to 9.x.x to match project EF Core version
+- Added Serilog.AspNetCore package (v9.0.0) which includes Console and File sinks
+- Configured Serilog with `LoggerConfiguration()` to write to console and rolling files
+- Used `RollingInterval.Day` for daily log files in `logs/devmetrics-log{Date}.txt`
+- Learned about `Log.Logger` static logger configuration before application startup
+- Wrapped application startup in try-catch-finally for proper error logging
+- Used `Log.Fatal()` for application startup failures
+- Used `Log.CloseAndFlush()` in finally block to ensure all logs are written before exit
+- Learned that `CloseAndFlush()` prevents log loss by flushing buffered logs from memory to disk
+- Implemented `IExceptionHandler` interface for global exception handling (ASP.NET Core 8+)
+- Created `GlobalExceptionHandler` class to catch all unhandled exceptions
+- Logged exceptions with `_logger.LogError()` for structured logging with full stack traces
+- Returned JSON error responses with different detail levels for Dev vs Production
+- Used `HttpStatusCode.InternalServerError` (500) for unhandled errors
+- Registered exception handler with `AddExceptionHandler<GlobalExceptionHandler>()`
+- Added `AddProblemDetails()` for RFC 7807 problem details support
+- Used `app.UseExceptionHandler()` middleware in pipeline (early placement is important)
+- Learned about `IHostEnvironment.IsDevelopment()` for environment-specific error messages
+- Tested the handler - it successfully caught database connection errors and returned clean JSON
+- Logs are automatically created in `logs/` directory (should be git-ignored)
+
+**Time spent**: ~1.5 hours  
+**Blockers**: None  
 **Notes**: 
+- Logging and error handling fully configured and tested!
+- Serilog creates structured logs with timestamps and log levels
+- All unhandled exceptions are now logged and return clean JSON responses
+- Created feature branch: `sprint1/phase1.4-logging-error-handling-#26`
+- Ready to commit and push 
 
 ---
 
@@ -242,8 +267,8 @@ Solid foundation with domain entities, database, authentication, and basic UI
 - [ ] JWT authentication functional
 - [ ] Auth API endpoints (register/login)
 - [ ] Basic Blazor UI with MudBlazor
-- [ ] Logging configured
-- [ ] Error handling middleware
+- [x] Logging configured
+- [x] Error handling middleware
 - [ ] >80% test coverage
 - [ ] CI pipeline green
 - [ ] Documentation updated
