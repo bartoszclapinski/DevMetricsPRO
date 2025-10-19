@@ -112,6 +112,35 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ---
 
+### Day 2 - October 19, 2025 (Continued)
+**Phases completed**:
+- [x] Phase 1.4: Logging & Error Handling ✅
+- [x] Phase 1.5: Week 1 Wrap-up ✅
+
+**Phase 1.5 - Week 1 Wrap-up:**
+- Created `DbInitializer.cs` static class with `SeedAsync()` method
+- Added seed data for 3 test developers (Sarah Chen, Marcus Johnson, Lisa Wong)
+- Configured automatic seeding in `Program.cs` for Development environment only
+- Used `app.Services.CreateScope()` to create DI scope for seeding
+- Learned about `context.Database.MigrateAsync()` to auto-apply migrations
+- Understood difference between Transient, Scoped, and Singleton DI lifetimes
+- Learned why manual scope creation is needed outside HTTP request context
+- Ready to test once Docker is fully configured
+
+**Week 1 Summary:**
+- ✅ All 5 phases complete (1.1 through 1.5)
+- ✅ Core domain layer complete with 5 entities
+- ✅ Database fully configured with EF Core and PostgreSQL
+- ✅ Repository pattern + Unit of Work implemented
+- ✅ Logging with Serilog configured
+- ✅ Global exception handler implemented
+- ✅ Development seed data ready
+
+**Time spent**: ~1.5 hours (Phase 1.5: ~0.5 hours)
+**Week 1 total**: ~6 hours
+
+---
+
 ### Day 3 - __________
 **Phases completed**:
 - [ ] Phase 1.3: Repository Pattern Implementation
