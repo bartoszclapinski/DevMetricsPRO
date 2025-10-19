@@ -8,6 +8,7 @@ This folder contains all project documentation, planning, and design files.
 .ai/
 ├── README.md                    # This file - documentation overview
 ├── GETTING-STARTED.md          # Quick start guide
+├── WORKFLOW-GUIDE.md           # Development workflow and conventions
 ├── project-idea.md             # Original project concept
 ├── prd.md                      # Product Requirements Document
 ├── design/
@@ -17,10 +18,10 @@ This folder contains all project documentation, planning, and design files.
     ├── overall-plan.md         # High-level 5-sprint roadmap
     ├── sprint0/
     │   ├── sprint-plan.md      # Detailed Sprint 0 steps
-    │   └── sprint-log.md       # Sprint 0 execution log (you create)
+    │   └── sprint-log.md       # Sprint 0 execution log
     ├── sprint1/
     │   ├── sprint-plan.md      # Detailed Sprint 1 steps
-    │   └── sprint-log.md       # Sprint 1 execution log (you create)
+    │   └── sprint-log.md       # Sprint 1 execution log
     └── sprint2-5/              # Future sprints
         └── sprint-plan.md      # To be created
 ```
@@ -29,6 +30,9 @@ This folder contains all project documentation, planning, and design files.
 
 ### Just Starting?
 👉 **Read**: `GETTING-STARTED.md` - Your step-by-step guide to begin
+
+### Need to Understand the Workflow?
+👉 **Read**: `WORKFLOW-GUIDE.md` - **IMPORTANT!** Issue-driven, guided-implementation workflow
 
 ### Want to Understand the Project?
 👉 **Read**: `prd.md` - Complete technical specification and architecture
@@ -53,6 +57,18 @@ This folder contains all project documentation, planning, and design files.
 - Implementation philosophy
 - Daily workflow tips
 - Progress tracking guidance
+
+#### `WORKFLOW-GUIDE.md`
+**Essential for consistency!** Complete development workflow documentation. Includes:
+- Issue-driven development process
+- User-implements, AI-guides approach
+- Step-by-step workflow for each phase
+- Git branching and commit conventions
+- PR and merge procedures
+- Daily development cycle
+- Progress tracking standards
+- Learning approach and patterns
+- Common commands reference
 
 #### `project-idea.md`
 Original project concept in Polish. Describes:

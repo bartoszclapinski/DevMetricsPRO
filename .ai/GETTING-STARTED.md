@@ -8,11 +8,32 @@ Your project is fully documented with:
 
 1. **Project Idea** (`project-idea.md`) - Original vision and concept
 2. **PRD** (`prd.md`) - Complete technical requirements and architecture
-3. **Overall Plan** (`sprints/overall-plan.md`) - High-level 5-sprint roadmap
-4. **Detailed Sprint Plans** - Step-by-step implementation guides:
-   - `sprints/sprint0-detailed-plan.md` ✅ Ready
-   - `sprints/sprint1-detailed-plan.md` ✅ Ready
-5. **Design Prototype** (`design/design-prototype.html`) - Visual reference
+3. **Workflow Guide** (`WORKFLOW-GUIDE.md`) - **IMPORTANT!** Development workflow and conventions
+4. **Overall Plan** (`sprints/overall-plan.md`) - High-level 5-sprint roadmap
+5. **Detailed Sprint Plans** - Step-by-step implementation guides:
+   - `sprints/sprint0/sprint-plan.md` ✅ Ready
+   - `sprints/sprint1/sprint-plan.md` ✅ Ready
+6. **Design Prototype** (`design/design-prototype.html`) - Visual reference
+
+## ⚠️ Important: Read the Workflow Guide First!
+
+Before you start implementing, **READ** `WORKFLOW-GUIDE.md`!
+
+This project follows a specific workflow:
+- **Issue-driven development**: Create GitHub issues before implementing
+- **User implements, AI guides**: You write the code, AI provides instructions
+- **Feature branches**: All work happens on feature branches
+- **Conventional commits**: Standardized commit messages
+- **Pull requests**: All changes merged via PRs
+
+**This workflow ensures:**
+- ✅ Learning by doing
+- ✅ Clean git history
+- ✅ Traceable progress
+- ✅ Professional practices
+- ✅ Consistent documentation
+
+👉 **Read `WORKFLOW-GUIDE.md` now before proceeding!**
 
 ## 🎯 Your Next Steps
 
