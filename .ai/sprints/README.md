@@ -116,7 +116,8 @@ Each sprint has specific success criteria that must be met before moving to the 
 
 ## 🔗 Related Documents
 
-- **Project Idea**: `..project-idea.md`
+- **Workflow Guide**: `../WORKFLOW-GUIDE.md` ⚠️ **READ THIS FIRST!**
+- **Project Idea**: `../project-idea.md`
 - **PRD**: `../prd.md`
 - **Overall Plan**: `overall-plan.md`
 - **Design Prototype**: `../design/design-prototype.html`
