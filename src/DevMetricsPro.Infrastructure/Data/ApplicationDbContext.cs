@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using DevMetricsPro.Core.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace DevMetricsPro.Infrastructure.Data;
 
 /// <summary>
-/// Main database context for the application
+/// Main database context for the application with Identity integration
 /// </summary>
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     /// <summary>
     /// Developers table
@@ -50,7 +53,27 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure ApplicationUser relationships with Developer
+        modelBuilder.Entity<ApplicationUser>()
+            .HasOne(u => u.Developer)
+            .WithOne()
+            .HasForeignKey<ApplicationUser>(u => u.DeveloperId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Apply all entity configurations from the Configurations folder
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+    }
+
+    /// <summary>
+    /// Update timestamps automatically for modified entities
+    /// </summary>
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is BaseEntity && e.State == EntityState.Modified);
+
+        foreach (var entry in entries) ((BaseEntity)entry.Entity).UpdatedAt = DateTime.UtcNow;
+
+        return base.SaveChangesAsync(cancellationToken);
     }
 }

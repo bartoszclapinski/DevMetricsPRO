@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Serilog;
 using DevMetricsPro.Web.Middleware;
+using DevMetricsPro.Core.Entities;
+using Microsoft.AspNetCore.Identity;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -36,6 +38,38 @@ try
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+    // Identity Configuration
+    builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+    {
+        // Password settings
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredLength = 8;
+
+        // Lockout settings
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.AllowedForNewUsers = true;
+
+        // User settings
+        options.User.RequireUniqueEmail = true;
+        options.SignIn.RequireConfirmedEmail = false; // Set to true for production
+    })
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+    // Configure application cookie
+    builder.Services.ConfigureApplicationCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.AccessDeniedPath = "/access-denied";
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+    });
+
     builder.Services.AddMudServices();
 
     var app = builder.Build();
@@ -59,6 +93,9 @@ try
 
     app.UseHttpsRedirection();
 
+    // Authentication and authorization
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.UseAntiforgery();
 
