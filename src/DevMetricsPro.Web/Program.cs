@@ -77,6 +77,9 @@ try
 
     builder.Services.AddMudServices();
 
+    // API Controllers
+    builder.Services.AddControllers();
+
     // Jwt Service
     builder.Services.AddScoped<IJwtService, JwtService>();
 
@@ -127,6 +130,8 @@ try
     app.MapStaticAssets();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
+
+    app.MapControllers();
 
     app.Run();
 }

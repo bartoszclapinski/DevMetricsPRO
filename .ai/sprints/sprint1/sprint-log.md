@@ -303,17 +303,88 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ---
 
-### Day 8 - __________
+### Day 8 - October 20, 2025 (Continued)
 **Phases completed**:
-- [ ] Phase 1.8: Authentication API Endpoints
+- [x] Phase 1.8: Authentication API Endpoints ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 1.8 - Authentication API Endpoints:**
+- Created Auth DTOs in Application layer:
+  - `RegisterRequest` with Email, Password, ConfirmPassword validation
+  - `LoginRequest` with Email, Password, RememberMe fields
+  - `AuthResponse` with Token, Email, DisplayName, ExpiresAt, RefreshToken
+- Used **Data Annotations** for validation: `[Required]`, `[EmailAddress]`, `[Compare]`
+- Created `AuthController` API controller with `[ApiController]` and `[Route("api/[controller]")]`
+- Injected Identity services: `UserManager<ApplicationUser>`, `SignInManager<ApplicationUser>`
+- Implemented **POST /api/auth/register** endpoint:
+  - Validates model state automatically (thanks to `[ApiController]`)
+  - Creates new `ApplicationUser` with email as username
+  - Uses `UserManager.CreateAsync(user, password)` for secure password hashing
+  - Returns JWT token immediately after successful registration
+- Implemented **POST /api/auth/login** endpoint:
+  - Finds user by email with `UserManager.FindByEmailAsync()`
+  - Validates password with `SignInManager.CheckPasswordSignInAsync()`
+  - Handles account lockout after failed attempts (security feature)
+  - Updates `LastLoginAt` timestamp on successful login
+  - Returns JWT token with user information
+- Used `[ProducesResponseType]` attributes for OpenAPI/Swagger documentation
+- Learned about **UserManager**: High-level API for user CRUD operations
+- Learned about **SignInManager**: Handles password validation and sign-in logic
+- Fixed role assignment issue: Commented out `AddToRoleAsync()` (roles not created yet)
+- Refactored to remove **magic numbers**: Used `Jwt:ExpirationMinutes` from config
+- Injected `IConfiguration` to read JWT expiration setting
+- Tested endpoints with PowerShell `Invoke-RestMethod`:
+  - ✅ Register: Successfully created user and returned JWT
+  - ✅ Login: Successfully authenticated and returned JWT
+- Decoded JWT token to verify claims:
+  - User ID (nameidentifier)
+  - Email (emailaddress)
+  - Username (name)
+  - Expiration (exp) - 60 minutes
+  - Issuer and Audience
+- Verified token expiration matches configuration (60 minutes)
+
+**Key Concepts:**
+- **API Controller**: Special controller for REST APIs (no views, JSON responses)
+- **Model Validation**: Automatic validation with Data Annotations
+- **UserManager<T>**: Identity service for user management (create, find, update)
+- **SignInManager<T>**: Identity service for authentication (password check, lockout)
+- **Password Hashing**: Identity automatically hashes passwords with PBKDF2
+- **Account Lockout**: Temporary lock after failed login attempts (brute-force protection)
+- **Bearer Token**: JWT sent in Authorization header for API authentication
+- **Claims**: User information embedded in JWT (stateless authentication)
+- **Model State**: ASP.NET Core validates incoming data automatically
+- **Action Results**: `Ok()`, `BadRequest()`, `Unauthorized()` return proper HTTP status codes
+
+**Challenges:**
+- Initial 500 error: Role "User" doesn't exist yet
+- Solution: Commented out role assignment for now (will implement role seeding later)
+- `CheckPasswordSignInAsync` signature error: Had extra `RememberMe` parameter
+- Solution: Removed incorrect parameter (RememberMe is for cookie auth, not password check)
+- Magic number in expiration: Hardcoded 30 minutes instead of config value
+- Solution: Injected IConfiguration and read `Jwt:ExpirationMinutes`
+- Process locking during rebuild: App was still running
+- Solution: Killed process with `taskkill /F /PID`
+
+**Testing:**
+- Created PowerShell test scripts for quick endpoint testing
+- Successfully registered new user: `finaltest@devmetrics.com`
+- Successfully logged in and received new JWT token
+- Decoded JWT to verify all claims present and correct
+- Verified token expiration time matches configuration
+- Cleaned up test scripts after verification
+
+**Time spent**: ~2 hours  
+**Blockers**: Role seeding needed (minor - not blocking MVP)  
 **Notes**: 
+- Authentication API fully functional! ✅
+- Both register and login endpoints working perfectly
+- JWT tokens generated with correct claims and expiration
+- Ready to move to Blazor UI (Phase 1.9)
+- Note: Role management will be added in future phase
+- Controllers properly use configuration instead of magic numbers
+- Authentication flow is complete and secure 
 
 ---
 
@@ -384,7 +455,7 @@ Solid foundation with domain entities, database, authentication, and basic UI
 - [x] Repository pattern with Unit of Work
 - [x] ASP.NET Core Identity setup ✅
 - [x] JWT authentication functional ✅
-- [ ] Auth API endpoints (register/login)
+- [x] Auth API endpoints (register/login) ✅
 - [ ] Basic Blazor UI with MudBlazor
 - [x] Logging configured
 - [x] Error handling middleware
