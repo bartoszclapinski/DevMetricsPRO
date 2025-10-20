@@ -244,17 +244,62 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ---
 
-### Day 7 - __________
+### Day 7 - October 20, 2025
 **Phases completed**:
-- [ ] Phase 1.7: JWT Authentication
+- [x] Phase 1.7: JWT Authentication ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 1.7 - JWT Authentication:**
+- Created `IJwtService` interface in Application layer with token generation methods
+- Implemented `JwtService` in Infrastructure layer for JWT token generation
+- Added JWT packages: `System.IdentityModel.Tokens.Jwt` and `Microsoft.IdentityModel.Tokens`
+- Learned about **JWT (JSON Web Tokens)**: Compact, URL-safe tokens for secure information transmission
+- Understood **Claims-based authentication**: Tokens contain claims (key-value pairs) about the user
+- Implemented token generation with user claims: NameIdentifier, Email, Username, Roles
+- Used **SymmetricSecurityKey** for token signing (HMAC-SHA256 algorithm)
+- Configured **SigningCredentials** to ensure tokens can't be tampered with
+- Set token expiration to 60 minutes (configurable in appsettings)
+- Implemented cryptographically secure refresh token generation using `RandomNumberGenerator`
+- Configured JWT settings in appsettings.json:
+  - **Key**: Minimum 32 characters for HMAC-SHA256 security
+  - **Issuer**: Who creates the token (`http://localhost:5234`)
+  - **Audience**: Who the token is for (also `http://localhost:5234`)
+  - **ExpirationMinutes**: Token lifetime (60 minutes)
+- Configured **dual authentication schemes**: Cookie (Blazor) + JWT (API)
+- Used `AddAuthentication().AddJwtBearer()` to add JWT without overriding Cookie auth
+- Configured **TokenValidationParameters** for secure token validation:
+  - ValidateIssuer, ValidateAudience, ValidateLifetime, ValidateIssuerSigningKey
+- Fixed URL mismatch: Changed from `https://localhost:5001` to `http://localhost:5234`
+- Learned that multiple authentication schemes can coexist in same application
+
+**Key Concepts:**
+- **JWT Structure**: Header.Payload.Signature (Base64 encoded)
+- **Claims**: Information about user stored in token (id, email, roles, etc.)
+- **Signing Key**: Secret used to sign tokens (prevents tampering)
+- **HMAC-SHA256**: Symmetric signing algorithm (same key signs and validates)
+- **Token Expiration**: Tokens have limited lifetime for security
+- **Refresh Tokens**: Long-lived tokens to get new access tokens
+- **Bearer Token**: Sent in Authorization header: `Bearer <token>`
+- **Issuer**: Entity that creates the token
+- **Audience**: Entity the token is intended for
+- **Stateless Authentication**: Server doesn't store session, all info in token
+
+**Challenges:**
+- Initial issue: Missing JWT packages in Infrastructure project
+- Solution: Added `System.IdentityModel.Tokens.Jwt` and `Microsoft.IdentityModel.Tokens`
+- URL configuration mismatch: appsettings had wrong port
+- Solution: Updated to match actual application URL
+- Authentication scheme conflict: JWT was overriding Cookie auth
+- Solution: Used `AddAuthentication().AddJwtBearer()` to add as additional scheme
+
+**Time spent**: ~1.5 hours  
+**Blockers**: Missing packages (resolved), URL mismatch (resolved)  
 **Notes**: 
+- JWT authentication fully configured and working alongside Cookie auth
+- Ready to create API endpoints that use JWT tokens (Phase 1.8)
+- Both Blazor (Cookie) and API (JWT) authentication schemes now supported
+- Application runs successfully with all authentication configured 
 
 ---
 
@@ -338,7 +383,7 @@ Solid foundation with domain entities, database, authentication, and basic UI
 - [x] Database migrations working
 - [x] Repository pattern with Unit of Work
 - [x] ASP.NET Core Identity setup ✅
-- [ ] JWT authentication functional
+- [x] JWT authentication functional ✅
 - [ ] Auth API endpoints (register/login)
 - [ ] Basic Blazor UI with MudBlazor
 - [x] Logging configured

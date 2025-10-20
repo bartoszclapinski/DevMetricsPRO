@@ -8,6 +8,11 @@ using Serilog;
 using DevMetricsPro.Web.Middleware;
 using DevMetricsPro.Core.Entities;
 using Microsoft.AspNetCore.Identity;
+using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -71,6 +76,26 @@ try
     });
 
     builder.Services.AddMudServices();
+
+    // Jwt Service
+    builder.Services.AddScoped<IJwtService, JwtService>();
+
+    // JWT Authentication (additional scheme for API endpoints)
+    builder.Services.AddAuthentication()
+        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            };
+        });
 
     var app = builder.Build();
 
