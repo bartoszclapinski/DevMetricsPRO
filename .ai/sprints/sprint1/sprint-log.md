@@ -185,17 +185,62 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ## WEEK 2: Authentication & Basic UI
 
-### Day 6 - __________
+### Day 6 - October 20, 2025
 **Phases completed**:
-- [ ] Phase 1.6: ASP.NET Core Identity Setup
+- [x] Phase 1.6: ASP.NET Core Identity Setup ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 1.6 - ASP.NET Core Identity:**
+- Created `ApplicationUser` entity extending `IdentityUser<Guid>` for custom user authentication
+- Used `Guid` instead of default `string` for user IDs for better performance and consistency
+- Added optional link between `ApplicationUser` and `Developer` entities (one user can be a developer)
+- Added custom properties to ApplicationUser: `CreatedAt`, `LastLoginAt`, `DeveloperId`
+- Updated `ApplicationDbContext` to extend `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`
+- Learned that **calling `base.OnModelCreating(modelBuilder)` is CRITICAL** for Identity tables configuration
+- Configured `SetNull` delete behavior (if developer deleted, user account remains)
+- Configured Identity services in `Program.cs` with password policies:
+  - Password: 8+ chars, requires digit, upper/lowercase (no special chars required)
+  - Lockout: 5 failed attempts = 5 min lockout (brute-force protection)
+  - Email: Must be unique, no confirmation required in dev mode
+- Configured application cookie settings:
+  - Login/logout paths, 7-day expiration, sliding expiration
+- Added authentication middleware: `UseAuthentication()` and `UseAuthorization()`
+- Learned middleware order is critical: HttpsRedirection → Authentication → Authorization → Antiforgery
+- Created `AddIdentityTables` migration that adds 7 Identity tables:
+  - AspNetUsers (with custom fields)
+  - AspNetRoles, AspNetUserRoles
+  - AspNetUserClaims, AspNetRoleClaims
+  - AspNetUserLogins, AspNetUserTokens
+- Discovered Web project needed `Microsoft.AspNetCore.Identity.UI` package for Identity services
+- Applied migration successfully - all Identity tables created in PostgreSQL
+- Verified both migrations in `__EFMigrationsHistory` table
+- Application runs successfully with full Identity integration
+
+**Key Concepts:**
+- **Identity Framework**: ASP.NET Core's built-in authentication/authorization system
+- **IdentityDbContext**: Special DbContext that configures Identity tables automatically
+- **IdentityUser<TKey>**: Base class for user entities with authentication properties
+- **IdentityRole<TKey>**: Base class for role entities (for role-based authorization)
+- **Password Policies**: Enforce strong passwords to protect user accounts
+- **Lockout**: Temporary account lock after failed login attempts (security feature)
+- **Sliding Expiration**: Cookie lifetime extends with user activity (stays logged in)
+- **Authentication vs Authorization**: Authentication = who you are, Authorization = what you can do
+
+**Challenges:**
+- Initial build error: Host was aborted during `builder.Build()`
+- Root cause: Missing Identity package in Web project
+- Solution: Added `Microsoft.AspNetCore.Identity.UI` package to Web project
+- Also needed to add authentication middleware to pipeline
+
+**Time spent**: ~2 hours  
+**Blockers**: Docker/WSL2 setup (resolved), missing package (resolved)  
 **Notes**: 
+- Identity is now fully integrated and ready for JWT authentication (Phase 1.7)
+- All Identity tables created successfully in PostgreSQL
+- Authentication middleware properly configured
+- Ready to build authentication API endpoints
+- Week 2 is 50% complete! 
 
 ---
 
@@ -292,7 +337,7 @@ Solid foundation with domain entities, database, authentication, and basic UI
 - [x] Entity Framework Core configured
 - [x] Database migrations working
 - [x] Repository pattern with Unit of Work
-- [ ] ASP.NET Core Identity setup
+- [x] ASP.NET Core Identity setup ✅
 - [ ] JWT authentication functional
 - [ ] Auth API endpoints (register/login)
 - [ ] Basic Blazor UI with MudBlazor
