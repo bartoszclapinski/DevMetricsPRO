@@ -1,23 +1,129 @@
 ﻿@inherits LayoutComponentBase
+@using DevMetricsPro.Web.Services
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@implements IDisposable
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                       Color="Color.Inherit" 
+                       Edge="Edge.Start" 
+                       OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-3">DevMetrics Pro</MudText>
+        <MudSpacer />
+        
+        @if (_isAuthenticated)
+        {
+            <MudText Typo="Typo.body2" Class="mr-4">
+                @_userEmail
+            </MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Logout" 
+                           Color="Color.Inherit" 
+                           OnClick="HandleLogout" />
+        }
+        else
+        {
+            <MudButton Href="/login" 
+                       Variant="Variant.Text" 
+                       Color="Color.Inherit">
+               Login
+            </MudButton>
+        }
+    </MudAppBar>
 
-        <article class="content px-4">
+    @if (_drawerOpen)
+    {
+        <MudPaper Elevation="1" Style="width: 240px; min-height: 100vh; position: fixed; left: 0; top: 64px; z-index: 1200;">
+            <NavMenu />
+        </MudPaper>
+    }
+
+    <MudMainContent Style="@(_drawerOpen ? "margin-left: 240px;" : "")">
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isAuthenticated = false;
+    private string _userEmail = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Wait for JavaScript to be ready
+            await Task.Delay(100);
+            
+            // Subscribe to navigation changes to refresh auth state
+            Navigation.LocationChanged += OnLocationChanged;
+            
+            await LoadAuthState();
+            StateHasChanged();
+        }
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Re-check auth state whenever navigation happens
+        await LoadAuthState();
+        StateHasChanged();
+    }
+
+    private async Task LoadAuthState()
+    {
+        try
+        {
+            _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+            
+            if (_isAuthenticated)
+            {
+                var userInfo = await AuthState.GetUserInfoAsync();
+                _userEmail = userInfo?.Email ?? "";
+            }
+            else
+            {
+                _userEmail = string.Empty;
+            }
+        }
+        catch (Exception)
+        {
+            // JS not ready or error
+            _isAuthenticated = false;
+        }
+    }
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthState.RemoveTokenAsync();
+        _isAuthenticated = false;
+        _userEmail = string.Empty;
+        StateHasChanged();
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from navigation changes
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

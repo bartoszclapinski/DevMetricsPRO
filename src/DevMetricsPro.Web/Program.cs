@@ -13,6 +13,7 @@ using DevMetricsPro.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using DevMetricsPro.Web.Services;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -42,6 +43,8 @@ try
     // Repository Pattern - Scoped lifetime for per-request instances
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+    // Authentication state service
+    builder.Services.AddScoped<AuthStateService>();
 
     // Identity Configuration
     builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -79,6 +82,12 @@ try
 
     // API Controllers
     builder.Services.AddControllers();
+
+    // HttpClient for calling our own API from Blazor components
+    builder.Services.AddScoped(sp => new HttpClient 
+    { 
+        BaseAddress = new Uri("http://localhost:5234") 
+    });
 
     // Jwt Service
     builder.Services.AddScoped<IJwtService, JwtService>();
