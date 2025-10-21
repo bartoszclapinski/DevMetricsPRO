@@ -388,17 +388,62 @@ Solid foundation with domain entities, database, authentication, and basic UI
 
 ---
 
-### Day 9 - __________
+### Day 9 - October 21, 2025
 **Phases completed**:
-- [ ] Phase 1.9: Basic Blazor UI
+- [x] Phase 1.9: Basic Blazor UI ✅
 
 **What I learned about Blazor**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 1.9 - Basic Blazor UI:**
+- Added and configured **MudBlazor** component library for modern Material Design UI
+- Created **Login page** with email/password form, validation, and error handling
+- Created **Register page** with email/password/confirm password validation
+- Built **AuthStateService** to manage JWT tokens in browser `localStorage`
+  - `GetTokenAsync()` - Retrieve token from localStorage
+  - `SaveTokenAsync()` - Store token in localStorage
+  - `RemoveTokenAsync()` - Clear token on logout
+  - `IsAuthenticatedAsync()` - Check if token exists and is not expired
+  - `GetUserInfoAsync()` - Extract user claims (email, name, roles) from JWT
+- Updated **MainLayout** to display user email and logout button when authenticated
+- Created **NavMenu** with MudBlazor navigation links (Dashboard, Repositories, Developers, Metrics, Settings)
+- Built **Dashboard/Home page** with stat cards and activity feed (mock data for now)
+- Implemented full auth flow: Register → Login → Dashboard → Logout
+
+**Key Concepts:**
+- **Blazor Server**: Server-side rendering with SignalR for real-time updates
+- **InteractiveServer RenderMode**: Required for client-side interactivity (button clicks, localStorage access)
+- **IJSRuntime**: Blazor's JavaScript interop for calling browser APIs like localStorage
+- **Component Lifecycle**: `OnInitializedAsync()`, `OnAfterRenderAsync()`, `OnParametersSetAsync()`
+- **NavigationManager**: Programmatic navigation and `LocationChanged` event subscription
+- **@inject**: Dependency injection in Razor components
+- **@rendermode**: Controls how components are rendered (SSR vs Interactive)
+- **MudBlazor Components**: MudLayout, MudAppBar, MudButton, MudTextField, MudCard, MudChip, etc.
+
+**Challenges:**
+- **MudDrawer JS Interop Error**: `mudElementRef.getBoundingClientRect` undefined error crashed Blazor circuit
+- **Solution**: Replaced `MudDrawer` with simple `MudPaper` + CSS positioning (no JS required)
+- **Auth State Not Updating**: MainLayout didn't refresh after login
+- **Solution**: Subscribe to `Navigation.LocationChanged` to reload auth state on navigation
+- **Circuit Crashes**: Unhandled JS errors kill ALL interactivity (buttons stop working)
+- **Lesson**: Always check browser console AND server logs for circuit errors
+- **Server-Side Prerendering**: During SSR, `localStorage` doesn't exist yet
+- **Solution**: Set `@rendermode="RenderMode.InteractiveServer"` on `<Routes />` component
+
+**Testing:**
+- ✅ Register new user → Receives JWT token → Redirects to dashboard
+- ✅ Login with existing user → Token stored → Email displayed in header
+- ✅ Logout → Token removed → Redirects to login page
+- ✅ Dashboard shows welcome message for unauthenticated users
+- ✅ Dashboard shows stat cards for authenticated users
+
+**Time spent**: ~4 hours  
+**Blockers**: None  
 **Notes**: 
+- Authentication UI fully functional! ✅
+- Complete register/login/logout flow working
+- User email displays in navigation bar when authenticated
+- MudBlazor provides beautiful Material Design components
+- Ready for data integration (Phase 2.x) 
 
 ---
 

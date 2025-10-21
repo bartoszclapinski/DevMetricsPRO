@@ -1,7 +1,148 @@
 ﻿@page "/"
+@using DevMetricsPro.Web.Services
+@inject AuthStateService AuthState
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - DevMetrics Pro</PageTitle>
 
-<h1>Hello, world!</h1>
+@if (!_isAuthenticated)
+{
+    <MudText Typo="Typo.h4" Class="mb-4">Welcome to DevMetrics Pro</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">
+        A real-time developer analytics platform for tracking team productivity and code quality.
+    </MudText>
+    <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large">
+        Get Started
+    </MudButton>
+}
+else
+{
+    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+    
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Commits</MudText>
+                            <MudText Typo="Typo.h4">1,247</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +12.5% from last week
+                            </MudText>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Large" Color="Color.Primary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
 
-Welcome to your new app.
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pull Requests</MudText>
+                            <MudText Typo="Typo.h4">89</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +8.3% from last week
+                            </MudText>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.MergeType" Size="Size.Large" Color="Color.Secondary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Active Developers</MudText>
+                            <MudText Typo="Typo.h4">24</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +2 this month
+                            </MudText>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Tertiary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Code Reviews</MudText>
+                            <MudText Typo="Typo.h4">156</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +15.2% from last week
+                            </MudText>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Info" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Activity Overview</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="py-8">
+                        <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                        <br />
+                        Chart visualization will be implemented in Sprint 3
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Recent Activity</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="string" Dense="true">
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Code">
+                            <MudText Typo="Typo.body2">New commit by Sarah Chen</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">2 minutes ago</MudText>
+                        </MudListItem>
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.MergeType">
+                            <MudText Typo="Typo.body2">PR #142 merged</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">15 minutes ago</MudText>
+                        </MudListItem>
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.RateReview">
+                            <MudText Typo="Typo.body2">Code review completed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">1 hour ago</MudText>
+                        </MudListItem>
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.BugReport">
+                            <MudText Typo="Typo.body2">Issue #89 closed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">3 hours ago</MudText>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+    }
+}

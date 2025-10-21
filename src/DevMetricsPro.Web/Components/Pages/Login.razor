@@ -1,0 +1,255 @@
+@page "/login"
+@using DevMetricsPro.Application.DTOs.Auth
+@using System.Net.Http.Json
+@using DevMetricsPro.Web.Services
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthStateService AuthState
+
+<PageTitle>Login - DevMetrics Analytics</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1 class="auth-title">LOGIN</h1>
+        </div>
+        
+        <div class="auth-body">
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="auth-error">
+                    @_errorMessage
+                </div>
+            }
+            
+            <EditForm Model="@_loginRequest" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+                
+                <div class="form-group">
+                    <label class="form-label">EMAIL ADDRESS</label>
+                    <InputText @bind-Value="_loginRequest.Email" 
+                               class="form-input" 
+                               placeholder="your.email@company.com" />
+                    <ValidationMessage For="@(() => _loginRequest.Email)" class="validation-message" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">PASSWORD</label>
+                    <InputText @bind-Value="_loginRequest.Password" 
+                               type="password" 
+                               class="form-input" 
+                               placeholder="••••••••" />
+                    <ValidationMessage For="@(() => _loginRequest.Password)" class="validation-message" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-checkbox">
+                        <InputCheckbox @bind-Value="_loginRequest.RememberMe" />
+                        <span>Remember me</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn-primary" disabled="@_isLoading">
+                    @if (_isLoading)
+                    {
+                        <span>Logging in...</span>
+                    }
+                    else
+                    {
+                        <span>Login</span>
+                    }
+                </button>
+            </EditForm>
+            
+            <div class="auth-footer">
+                <span class="text-muted">Don't have an account?</span>
+                <a href="/register" class="auth-link">Register here</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Professional auth styling matching design-prototype.html */
+    .auth-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #FAFBFC;
+        padding: 16px;
+    }
+    
+    .auth-card {
+        width: 100%;
+        max-width: 400px;
+        background: #FFFFFF;
+        border: 1px solid #E1E4E8;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(27, 31, 35, 0.06);
+    }
+    
+    .auth-header {
+        padding: 20px;
+        border-bottom: 1px solid #E1E4E8;
+        background: #F6F8FA;
+    }
+    
+    .auth-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #24292E;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .auth-body {
+        padding: 24px;
+    }
+    
+    .auth-error {
+        padding: 12px;
+        background: rgba(215, 58, 73, 0.1);
+        border: 1px solid #D73A49;
+        border-radius: 4px;
+        color: #D73A49;
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        color: #586069;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+    
+    .form-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #E1E4E8;
+        border-radius: 4px;
+        background: #FFFFFF;
+        color: #24292E;
+        font-size: 14px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        transition: border-color 0.15s;
+    }
+    
+    .form-input:focus {
+        outline: none;
+        border-color: #0366D6;
+        box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+    }
+    
+    .form-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #24292E;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        width: 100%;
+        padding: 10px 16px;
+        background: #0366D6;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+        margin-top: 8px;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+        background: #0256C5;
+    }
+    
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .auth-footer {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #E1E4E8;
+        text-align: center;
+        font-size: 13px;
+    }
+    
+    .text-muted {
+        color: #6A737D;
+    }
+    
+    .auth-link {
+        color: #0366D6;
+        text-decoration: none;
+        margin-left: 4px;
+    }
+    
+    .auth-link:hover {
+        text-decoration: underline;
+    }
+    
+    .validation-message {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #D73A49;
+    }
+</style>
+
+@code {
+    private LoginRequest _loginRequest = new();
+    private string _errorMessage = string.Empty;
+    private bool _isLoading = false;
+    
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/auth/login", _loginRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                
+                if (authResponse != null && !string.IsNullOrEmpty(authResponse.Token))
+                {
+                    // Save token to localStorage
+                    await AuthState.SaveTokenAsync(authResponse.Token);
+                }
+
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = "Invalid email or password. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
