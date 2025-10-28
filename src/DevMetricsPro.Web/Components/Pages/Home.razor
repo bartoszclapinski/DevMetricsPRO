@@ -1,6 +1,10 @@
 ﻿@page "/"
 @using DevMetricsPro.Web.Services
 @inject AuthStateService AuthState
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ILogger<Home> Logger
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard - DevMetrics Pro</PageTitle>
 
@@ -138,11 +142,91 @@ else
     </MudGrid>
 }
 
+@if (_isAuthenticated)
+{
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Custom.Brands.GitHub" Class="mr-2" />
+                            GitHub Integration
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (string.IsNullOrEmpty(githubConnectedMessage))
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-3">
+                            Connect your GitHub account to sync repositories and track metrics.
+                        </MudText>
+                        <MudButton 
+                            Variant="Variant.Filled" 
+                            Color="Color.Dark" 
+                            StartIcon="@Icons.Custom.Brands.GitHub"
+                            OnClick="ConnectGitHub"
+                            Disabled="isConnectingGitHub">
+                            @if (isConnectingGitHub)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Connecting...</span>
+                            }
+                            else
+                            {
+                                <span>Connect GitHub</span>
+                            }
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success">@githubConnectedMessage</MudAlert>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
 @code {
     private bool _isAuthenticated = false;
+    private bool isConnectingGitHub = false;
+    private string? githubConnectedMessage;
 
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+    }
+
+    private async Task ConnectGitHub()
+    {
+        isConnectingGitHub = true;
+        
+        try
+        {
+            // Call our API to get the GitHub authorization URL
+            var response = await Http.GetFromJsonAsync<GitHubAuthResponse>("/api/github/authorize");
+            
+            if (response?.AuthorizationUrl != null)
+            {
+                // Redirect to GitHub authorization page
+                Navigation.NavigateTo(response.AuthorizationUrl, forceLoad: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error connecting to GitHub");
+            Snackbar.Add("Failed to connect to GitHub. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            isConnectingGitHub = false;
+        }
+    }
+
+    // Helper class for deserializing API response
+    private class GitHubAuthResponse
+    {
+        public string? AuthorizationUrl { get; set; }
     }
 }
