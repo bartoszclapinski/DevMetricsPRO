@@ -32,6 +32,15 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
 
+    // Session support (for OAuth state validation)
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddSession(options =>
+    {
+        options.IdleTimeout = TimeSpan.FromMinutes(10);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+    });
+
     // Add services to the container.
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
@@ -67,6 +76,10 @@ try
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
+
+    // GitHub OAuth Service
+    builder.Services.AddHttpClient(); // Required for HttpClientFactory
+    builder.Services.AddScoped<IGitHubOAuthService, GitHubOAuthService>();
 
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
@@ -133,6 +146,8 @@ try
     // Authentication and authorization
     app.UseAuthentication();
     app.UseAuthorization();
+
+    app.UseSession();
 
     app.UseAntiforgery();
 

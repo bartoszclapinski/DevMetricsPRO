@@ -419,3 +419,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+
+# DO NOT SHARE
+.ai/helpers/DO-NOT-SHARE.md
