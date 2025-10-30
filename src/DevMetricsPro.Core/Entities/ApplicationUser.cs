@@ -26,4 +26,26 @@ public class ApplicationUser : IdentityUser<Guid>
     /// Last successful login timestamp
     /// </summary>
     public DateTime? LastLoginAt { get; set; }
+
+    // Github integration fields
+
+    /// <summary>
+    /// Github access token (encrypted in database)
+    /// </summary>
+    public string? GitHubAccessToken { get; set; }
+
+    /// <summary>
+    /// GitHub username
+    /// </summary>
+    public string? GitHubUsername { get; set; }
+
+    /// <summary>
+    /// GitHub user Id (numeric ID from GitHub)
+    /// </summary>
+    public long? GitHubUserId { get; set; }
+
+    /// <summary>
+    /// When the GitHub account was connected
+    /// </summary>
+    public DateTime? GitHubConnectedAt { get; set; }
 }

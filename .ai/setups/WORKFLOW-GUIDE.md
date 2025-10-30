@@ -9,12 +9,12 @@ This document describes the **issue-driven, guided-implementation** workflow use
 ### 1. **Issue-Driven Development**
 Every feature, phase, or significant change MUST have a GitHub issue created first.
 
-### 2. **AI Implements, User Reviews**
-- The **AI implements code directly** using available tools
-- The **AI explains** what is being implemented and why
-- The **USER reviews and approves** changes before they're applied
-- The **USER learns** by understanding the implementation
-- The **AI** commits changes after user approval
+### 2. **AI Guides, User Implements**
+- The **AI guides and explains** what needs to be implemented and why
+- The **USER implements code** themselves in their IDE
+- The **AI reviews** the implementation and checks for correctness
+- The **USER learns** by actually writing the code
+- The **AI helps** with documentation and commit messages
 
 ### 3. **Learning-First Approach**
 - Explanations are provided for **WHY** we do things
@@ -61,40 +61,43 @@ git checkout -b sprint1/phase1.X-feature-name-#IssueNumber
 - `sprintX/phaseY.Z-feature-name-#IssueNumber`
 - Example: `sprint1/phase1.4-logging-error-handling-#26`
 
-### Step 3: AI Implements Feature
-**AI implements the code directly:**
+### Step 3: AI Guides Implementation
+**AI explains what to implement:**
 
 ```
 Now let's implement [Feature].
 
-I'll create [File] at [path]:
+You need to create [File] at [path]:
 
 [Explanation of what this file does and why]
 
-Here's what I'm implementing:
-[Code explanation with key concepts]
+Here's the code you should add:
+[Code with full explanations]
 
-[AI uses tools to create/modify files]
+Let me know when you've implemented it and I'll review!
 ```
 
-### Step 4: User Reviews Implementation
-**USER reviews and approves changes:**
+### Step 4: User Implements Code
+**USER writes the code in their IDE:**
 
 ```
-[User sees the changes in their IDE]
+[User opens file in IDE]
+[User types/pastes the code]
+[User saves the file]
 
-User: Ok, looks good / I have a question about [X]
+User: Ok, I've implemented it. Please check it out.
 ```
 
-### Step 5: AI Commits Changes (with User Approval)
-**AI commits after user confirms:**
+### Step 5: AI Reviews Implementation
+**AI reviews the user's code:**
 
 ```
-Perfect! Let me commit these changes...
+Let me check your implementation...
 
-[AI uses git add and git commit]
+[AI reads the file to verify]
 
-Committed! Ready for the next step?
+Perfect! Your implementation looks correct. 
+[Or: I see a small issue on line X...]
 ```
 
 ### Step 6: Push Changes
@@ -521,5 +524,5 @@ This workflow is working well when:
 **Sprint**: Sprint 1 - Phase 1.9 Complete (90% done!)  
 **Next Phase**: Phase 1.10 - Sprint 1 Wrap-up
 
-**Note**: This workflow reflects the **actual practice** where AI implements code directly using tools, and user reviews/approves changes. This differs from the original "user implements" approach but has proven more efficient for learning while maintaining code quality.
+**Note**: This workflow reflects the **actual practice** where **USER implements code** in their IDE while **AI guides and reviews**. This hands-on approach ensures the user learns by actually writing code, not just reviewing AI-generated code.
 
