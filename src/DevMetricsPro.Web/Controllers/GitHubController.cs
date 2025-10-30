@@ -32,27 +32,66 @@ public class GitHubController : ControllerBase
     /// </summary>
     /// <returns>GitHub authorization URL to redirect to</returns>
     [HttpGet("authorize")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     public IActionResult GetAuthorizationUrl()
     {
-        // Generate a random state for CSRF protection
-        var state = Guid.NewGuid().ToString();
+        // Get current user ID
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { error = "User not authenticated" });
+        }
 
-        // Store state in session or temp data for validation on callback
+        // Include user ID in state for callback validation
+        var state = $"{Guid.NewGuid()}:{userId}";
+        
+        // Store state in session for CSRF validation
         HttpContext.Session.SetString("GitHubOAuthState", state);
 
         var authUrl = _gitHubOAuthService.GetAuthorizationUrl(state);
 
-        _logger.LogInformation("Generated GitHub OAuth URL for user");
+        _logger.LogInformation("Generated GitHub OAuth URL for user {UserId}", userId);
 
         return Ok(new { authorizationUrl = authUrl }); 
+    }
+
+    /// <summary>
+    /// Get GitHub connection status for current user
+    /// </summary>
+    /// <returns>Connection status with username if connected</returns>
+    [HttpGet("status")]
+    [Authorize(AuthenticationSchemes = "Bearer")]  // Use JWT Bearer auth
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetConnectionStatus()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { error = "User not authenticated" });
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        var isConnected = !string.IsNullOrEmpty(user.GitHubUsername);
+
+        return Ok(new 
+        { 
+            connected = isConnected, 
+            username = user.GitHubUsername, 
+            connectedAt = user.GitHubConnectedAt
+        });
     }
 
     /// <summary>
     /// GitHub OAuth callback endpoint - receives authorization code
     /// </summary>
     /// <param name="code">Authorization code from GitHub</param>
-    /// <param name="state">State parameter for CSRF validation</param>
+    /// <param name="state">State parameter for CSRF validation and user ID</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success or error message</returns>
     [HttpGet("callback")]
@@ -65,59 +104,67 @@ public class GitHubController : ControllerBase
         [FromQuery] string state,
         CancellationToken cancellationToken)
     {
-        // Validate state parameter (CSRF protection)
-        // TODO: Fix session state sharing between Blazor and API controllers
-        // var savedState = HttpContext.Session.GetString("GitHubOAuthState");
-        // if (string.IsNullOrEmpty(savedState) || savedState != state)
-        // {
-        //     _logger.LogWarning("GitHub OAuth state mismatch - possible CSRF attack");
-        //     return BadRequest(new { error = "Invalid state parameter"});
-        // }
+        if (string.IsNullOrEmpty(state) || string.IsNullOrEmpty(code))
+        {
+            _logger.LogWarning("GitHub callback received with missing parameters");
+            return Redirect("/?error=invalid-request");
+        }
 
         try
         {
+            // Extract user ID from state parameter (format: "guid:userId")
+            var stateParts = state.Split(':', 2);
+            if (stateParts.Length != 2)
+            {
+                _logger.LogWarning("Invalid state parameter format");
+                return Redirect("/?error=invalid-state");
+            }
+
+            var userId = stateParts[1];
+            _logger.LogInformation("Processing GitHub callback for user {UserId}", userId);
+
             // Exchange code for access token and get user info
             var oauthResponse = await _gitHubOAuthService.ExchangeCodeForTokenAsync(
                 code, cancellationToken);
-            
-            // TODO: Fix user authentication context preservation during OAuth redirect
-            // For now, temporarily disabled for testing OAuth token exchange
-            /*
-            // Get currently logged-in user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogWarning("GitHub callback received but user not authenticated");
-                return Unauthorized(new { error = "User must be logged in"});
-            }
 
+            // Find user in database
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return Unauthorized(new { error = "User not found"});
+                _logger.LogError("User not found for ID: {UserId}", userId);
+                return Redirect("/?error=user-not-found");
             }
-            */
 
-            _logger.LogInformation("User authentication check temporarily disabled for OAuth testing");
+            // Save GitHub information to database
+            user.GitHubAccessToken = oauthResponse.AccessToken;
+            user.GitHubUsername = oauthResponse.GitHubUsername;
+            user.GitHubUserId = oauthResponse.GitHubUserId;
+            user.GitHubConnectedAt = DateTime.UtcNow;
 
-            // TODO: Store access token and GitHub info in database
-            // For now just log success
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                _logger.LogError("Failed to update user with GitHub info: {Errors}", 
+                    string.Join(", ", updateResult.Errors.Select(e => e.Description)));
+                return Redirect("/?error=update-failed");
+            }
+
             _logger.LogInformation(
-                "Successfully authenticated GitHub user {Username} with email {Email}",
+                "Successfully connected GitHub account {Username} for user {UserId}",
                 oauthResponse.GitHubUsername,
-                oauthResponse.Email
+                userId
             );
 
             // Clear the state from session
             HttpContext.Session.Remove("GitHubOAuthState");
 
-            // Redirect to home page (TODO: Create /settings page)
-            return Redirect("/?github=connected");       
+            // Redirect to home page with success message
+            return Redirect("/?github=connected");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during GitHub OAuth callback");
-            return BadRequest(new { error = "Failed to connect GitHub account", detail = ex.Message });
+            return Redirect("/?error=connection-failed");
         }
     }
 

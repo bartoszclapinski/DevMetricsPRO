@@ -156,7 +156,7 @@ else
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    @if (string.IsNullOrEmpty(githubConnectedMessage))
+                    @if (!isGitHubConnected)
                     {
                         <MudText Typo="Typo.body2" Class="mb-3">
                             Connect your GitHub account to sync repositories and track metrics.
@@ -180,7 +180,17 @@ else
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Success">@githubConnectedMessage</MudAlert>
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            ✓ Connected as <strong>@@@githubUsername</strong>
+                        </MudAlert>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Your GitHub account is linked and ready to sync.
+                        </MudText>
+                    }
+                    
+                    @if (!string.IsNullOrEmpty(githubConnectedMessage))
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-3">@githubConnectedMessage</MudAlert>
                     }
                 </MudCardContent>
             </MudCard>
@@ -191,42 +201,110 @@ else
 @code {
     private bool _isAuthenticated = false;
     private bool isConnectingGitHub = false;
+    private bool isGitHubConnected = false;
+    private string? githubUsername;
     private string? githubConnectedMessage;
 
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+        
+        if (_isAuthenticated)
+        {
+            await CheckGitHubConnectionStatus();
+        }
+        
+        // Check if we were redirected back from GitHub OAuth
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (query["github"] == "connected")
+        {
+            githubConnectedMessage = "GitHub account connected successfully!";
+            await CheckGitHubConnectionStatus(); // Refresh status
+        }
     }
 
-    private async Task ConnectGitHub()
+    private async Task CheckGitHubConnectionStatus()
     {
-        isConnectingGitHub = true;
-        
         try
         {
-            // Call our API to get the GitHub authorization URL
-            var response = await Http.GetFromJsonAsync<GitHubAuthResponse>("/api/github/authorize");
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+                return;
+
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/status");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             
-            if (response?.AuthorizationUrl != null)
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
             {
-                // Redirect to GitHub authorization page
-                Navigation.NavigateTo(response.AuthorizationUrl, forceLoad: true);
+                var status = await response.Content.ReadFromJsonAsync<GitHubStatusResponse>();
+                if (status?.Connected == true)
+                {
+                    isGitHubConnected = true;
+                    githubUsername = status.Username;
+                }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error connecting to GitHub");
-            Snackbar.Add("Failed to connect to GitHub. Please try again.", Severity.Error);
-        }
-        finally
-        {
-            isConnectingGitHub = false;
+            Logger.LogError(ex, "Error checking GitHub connection status");
         }
     }
 
-    // Helper class for deserializing API response
+    private async Task ConnectGitHub()
+{
+    isConnectingGitHub = true;
+    
+    try
+    {
+        var token = await AuthState.GetTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            Snackbar.Add("Please login first", Severity.Warning);
+            return;
+        }
+
+        // Create request with Authorization header
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/authorize");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        
+        var response = await Http.SendAsync(request);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<GitHubAuthResponse>();
+            if (result?.AuthorizationUrl != null)
+            {
+                // Redirect to GitHub authorization page
+                Navigation.NavigateTo(result.AuthorizationUrl, forceLoad: true);
+            }
+        }
+        else
+        {
+            Snackbar.Add("Failed to initiate GitHub connection", Severity.Error);
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.LogError(ex, "Error connecting to GitHub");
+        Snackbar.Add("Failed to connect to GitHub. Please try again.", Severity.Error);
+    }
+    finally
+    {
+        isConnectingGitHub = false;
+    }
+}
+
+    // Helper classes for deserializing API responses
     private class GitHubAuthResponse
     {
         public string? AuthorizationUrl { get; set; }
+    }
+
+    private class GitHubStatusResponse
+    {
+        public bool Connected { get; set; }
+        public string? Username { get; set; }
+        public DateTime? ConnectedAt { get; set; }
     }
 }
