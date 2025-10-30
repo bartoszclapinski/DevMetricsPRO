@@ -400,12 +400,13 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # VS Code files for those working on multiple tools
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
+.vscode/
+# Uncomment below if you want to commit some VS Code settings
+# !.vscode/settings.json
+# !.vscode/tasks.json
+# !.vscode/launch.json
+# !.vscode/extensions.json
+# !.vscode/*.code-snippets
 
 # Local History for Visual Studio Code
 .history/
@@ -423,3 +424,6 @@ FodyWeavers.xsd
 
 # DO NOT SHARE
 .ai/helpers/DO-NOT-SHARE.md
+
+# Personal Cursor AI Rules (local only, not committed)
+.cursor/personal-rules.md
