@@ -1,8 +1,11 @@
+using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using DevMetricsPro.Core.Enums;
 
 namespace DevMetricsPro.Web.Controllers;
 
@@ -17,14 +20,20 @@ public class GitHubController : ControllerBase
     private readonly IGitHubOAuthService _gitHubOAuthService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<GitHubController> _logger;
+    private readonly IGitHubRepositoryService _githubRepositoryService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GitHubController(IGitHubOAuthService gitHubOAuthService,
         UserManager<ApplicationUser> userManager,
-        ILogger<GitHubController> logger)
+        ILogger<GitHubController> logger,
+        IGitHubRepositoryService githubRepositoryService,
+        IUnitOfWork unitOfWork)
     {
         _gitHubOAuthService = gitHubOAuthService ?? throw new ArgumentNullException(nameof(gitHubOAuthService));
         _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _githubRepositoryService = githubRepositoryService ?? throw new ArgumentNullException(nameof(githubRepositoryService));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
     /// <summary>
@@ -177,5 +186,160 @@ public class GitHubController : ControllerBase
     {
         return Ok(new { message = "GitHub OAuth controller is working" });
     }
-        
+
+    /// <summary>
+    /// Sync repositories from GitHub for the authenticated user
+    /// </summary>
+    /// <returns>List of synced repositories</returns>
+    [HttpPost("sync-repositories")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SyncRepositories(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Starting repository sync for user");
+
+            // Get currently logged-in user
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("Sync repositories called without authenticated user");
+                return Unauthorized(new { error = "User not authenticated" });
+            }
+
+            // Get user from database with GitHub token
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.LogError("User {UserId} not found in database", userId);
+                return NotFound(new { error = "User not found" });
+            }
+
+            // Check if GitHub is connected
+            if (string.IsNullOrEmpty(user.GitHubAccessToken))
+            {
+                _logger.LogWarning("User {UserId} attempted to sync without connected GitHub account", userId);
+                return BadRequest(new {error = "GitHub account not connected. Please connect your GitHub account first."});
+            }
+
+            // Fetch repositories from GitHub
+            _logger.LogInformation("Fetching repositories from GitHub for user {UserId}", userId);
+            var githubRepos = await _githubRepositoryService.GetUserRepositoriesAsync(
+                user.GitHubAccessToken, cancellationToken);
+
+            // Save repositories to database
+            var (addedCount, updatedCount) = await SaveRepositoriesToDatabaseAsync(
+                githubRepos, user, cancellationToken);
+            
+            _logger.LogInformation("Successfully synced {Count} repositories for user {UserId}",
+                githubRepos.Count(), userId);
+
+            return Ok(new
+            {
+                success = true,
+                count = githubRepos.Count(),
+                repositories = githubRepos
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "GitHub authorization failed during repository sync");
+            return Unauthorized(new {error = ex.Message});
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing repositories from GitHub");
+            return StatusCode(500, new { error = "Failed to sync repositories", detail = ex.Message });
+        }
+    }
+
+    /// <summary>
+/// Saves or updates repositories in the database
+/// </summary>
+/// <param name="githubRepos">GitHub repository DTOs to save</param>
+/// <param name="user">Current application user</param>
+/// <param name="cancellationToken">Cancellation token</param>
+/// <returns>Tuple with (addedCount, updatedCount)</returns>
+    private async Task<(int addedCount, int updatedCount)> SaveRepositoriesToDatabaseAsync(
+        IEnumerable<GitHubRepositoryDto> githubRepos,
+        ApplicationUser user,
+        CancellationToken cancellationToken)
+    {
+        var repositoryRepo = _unitOfWork.Repository<Repository>();
+        int addedCount = 0;
+        int updatedCount = 0;
+
+        foreach (var githubRepo in githubRepos)
+        {
+            // Check if repository already exists by ExternalId (GitHub ID)
+            var existingRepos = await repositoryRepo.FindAsync(
+                r => r.ExternalId == githubRepo.Id.ToString() && r.Platform == PlatformType.GitHub,
+                cancellationToken);
+            
+            var existingRepo = existingRepos.FirstOrDefault();
+
+            if (existingRepo != null)
+            {
+                // Update existing repository
+                existingRepo.Name = githubRepo.Name;
+                existingRepo.Description = githubRepo.Description;
+                existingRepo.Url = githubRepo.HtmlUrl;
+                existingRepo.FullName = $"{user.GitHubUsername}/{githubRepo.Name}";
+                existingRepo.IsPrivate = githubRepo.IsPrivate;
+                existingRepo.IsFork = githubRepo.IsFork;
+                existingRepo.StargazersCount = githubRepo.StargazersCount;
+                existingRepo.ForksCount = githubRepo.ForksCount;
+                existingRepo.OpenIssuesCount = githubRepo.OpenIssuesCount;
+                existingRepo.Language = githubRepo.Language;
+                existingRepo.PushedAt = githubRepo.PushedAt;
+                existingRepo.LastSyncedAt = DateTime.UtcNow;
+                existingRepo.UpdatedAt = DateTime.UtcNow;
+
+                await repositoryRepo.UpdateAsync(existingRepo, cancellationToken);
+                updatedCount++;
+                _logger.LogDebug("Updated existing repository {RepoName}", githubRepo.Name);
+            }
+            else
+            {
+                // Create new repository
+                var newRepo = new Repository
+                {
+                    Id = Guid.NewGuid(),
+                    Name = githubRepo.Name,
+                    Description = githubRepo.Description,
+                    Platform = PlatformType.GitHub,
+                    ExternalId = githubRepo.Id.ToString(),
+                    Url = githubRepo.HtmlUrl,
+                    DefaultBranch = "main", // GitHub default
+                    FullName = $"{user.GitHubUsername}/{githubRepo.Name}",
+                    IsPrivate = githubRepo.IsPrivate,
+                    IsFork = githubRepo.IsFork,
+                    StargazersCount = githubRepo.StargazersCount,
+                    ForksCount = githubRepo.ForksCount,
+                    OpenIssuesCount = githubRepo.OpenIssuesCount,
+                    Language = githubRepo.Language,
+                    PushedAt = githubRepo.PushedAt,
+                    IsActive = true,
+                    LastSyncedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await repositoryRepo.AddAsync(newRepo, cancellationToken);
+                addedCount++;
+                _logger.LogDebug("Added new repository {RepoName}", githubRepo.Name);
+            }
+        }
+
+        // Save all changes to database
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Repository sync complete: {Added} added, {Updated} updated",
+            addedCount, updatedCount);
+
+        return (addedCount, updatedCount);
+    }
 }

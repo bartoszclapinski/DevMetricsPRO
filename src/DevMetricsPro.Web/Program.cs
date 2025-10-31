@@ -80,6 +80,8 @@ try
     // GitHub OAuth Service
     builder.Services.AddHttpClient(); // Required for HttpClientFactory
     builder.Services.AddScoped<IGitHubOAuthService, GitHubOAuthService>();
+    builder.Services.AddScoped<IGitHubRepositoryService, GitHubRepositoryService>();
+
 
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>

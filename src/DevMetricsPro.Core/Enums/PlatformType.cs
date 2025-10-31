@@ -5,7 +5,7 @@ namespace DevMetricsPro.Core.Enums;
 /// </summary>
 public enum PlatformType
 {
-    Github,
+    GitHub,
     GitLab,
     Azure
 }

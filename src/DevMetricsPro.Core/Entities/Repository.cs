@@ -46,6 +46,46 @@ public class Repository : BaseEntity
     /// Last time we synchronized data from this repository
     /// </summary>
     public DateTime? LastSyncedAt { get; set; }
+    
+    /// <summary>
+    /// Full repository name in owner/repo format (GitHub specific)
+    /// </summary>
+    public string? FullName { get; set; }
+
+    /// <summary>
+    /// Whether the repository is private
+    /// </summary>
+    public bool IsPrivate { get; set; }
+
+    /// <summary>
+    /// Whether the repository is a fork
+    /// </summary>
+    public bool IsFork { get; set; }
+
+    /// <summary>
+    /// Number of stars (GitHub/GitLab)
+    /// </summary>
+    public int StargazersCount { get; set; }
+
+    /// <summary>
+    /// Number of forks
+    /// </summary>
+    public int ForksCount { get; set; }
+
+    /// <summary>
+    /// Number of open issues
+    /// </summary>
+    public int OpenIssuesCount { get; set; }
+
+    /// <summary>
+    /// Primary programming language
+    /// </summary>
+    public string? Language { get; set; }
+
+    /// <summary>
+    /// Last push timestamp (from platform)
+    /// </summary>
+    public DateTime? PushedAt { get; set; }
 
 
     // Navigation properties - relationships to other entities

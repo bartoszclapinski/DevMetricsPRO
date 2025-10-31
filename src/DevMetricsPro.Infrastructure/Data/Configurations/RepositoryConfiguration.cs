@@ -39,6 +39,12 @@ public class RepositoryConfiguration : IEntityTypeConfiguration<Repository>
             .IsRequired()
             .HasConversion<string>(); // Store enum as string in database
 
+        builder.Property(r => r.FullName)
+            .HasMaxLength(300);
+
+        builder.Property(r => r.Language)
+            .HasMaxLength(50);
+
         
         // Indexes for better query performance
         builder.HasIndex(r => r.ExternalId);

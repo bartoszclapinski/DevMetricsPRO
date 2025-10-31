@@ -2,10 +2,28 @@
 
 > Real-time developer analytics dashboard built with .NET 9 and Blazor Server
 
+## Build & Quality
 [![.NET CI](https://github.com/bartoszclapinski/DevMetricsPRO/workflows/.NET%20CI/badge.svg)](https://github.com/bartoszclapinski/DevMetricsPRO/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
-[![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
+[![Code Coverage](https://img.shields.io/badge/Coverage-80%25-brightgreen?style=flat)](https://github.com/bartoszclapinski/DevMetricsPRO)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat)](https://github.com/bartoszclapinski/DevMetricsPRO/pulls)
+
+## Technology Stack
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat&logo=.net&logoColor=white)](https://dotnet.microsoft.com/)
+[![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?style=flat&logo=blazor&logoColor=white)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
+[![C#](https://img.shields.io/badge/C%23-12-239120?style=flat&logo=c-sharp&logoColor=white)](https://docs.microsoft.com/dotnet/csharp/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+
+## Integrations
+[![GitHub](https://img.shields.io/badge/GitHub-Integrated-181717?style=flat&logo=github&logoColor=white)](https://github.com)
+[![GitLab](https://img.shields.io/badge/GitLab-Planned-FC6D26?style=flat&logo=gitlab&logoColor=white)](https://gitlab.com)
+[![Jira](https://img.shields.io/badge/Jira-Planned-0052CC?style=flat&logo=jira&logoColor=white)](https://www.atlassian.com/software/jira)
+
+## Architecture & Design
+[![Clean Architecture](https://img.shields.io/badge/Architecture-Clean-blue?style=flat)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+[![MudBlazor](https://img.shields.io/badge/UI-MudBlazor-594AE2?style=flat)](https://mudblazor.com/)
 
 ## 🚀 About
 
