@@ -138,45 +138,43 @@ Each phase builds on the previous, allowing incremental testing and validation.
 
 **Goal**: Fetch and store user's GitHub repositories
 
-### Step 2.3.1: Create Repository Service
+### Step 2.3.1: Create Repository Service ✅
 
-- [ ] **Create `IGitHubRepositoryService` interface**:
+- [x] **Create `IGitHubRepositoryService` interface**:
   ```csharp
-  Task<IEnumerable<RepositoryDto>> GetUserRepositoriesAsync(string accessToken, CancellationToken cancellationToken);
-  Task SyncRepositoriesAsync(Guid userId, CancellationToken cancellationToken);
+  Task<IEnumerable<GitHubRepositoryDto>> GetUserRepositoriesAsync(string accessToken, CancellationToken cancellationToken);
   ```
 
-- [ ] **Implement `GitHubRepositoryService`**:
+- [x] **Implement `GitHubRepositoryService`**:
   - Use Octokit.NET library for GitHub API
   - Fetch repositories using authenticated client
   - Map GitHub repo data to our Repository entity
   - Handle pagination (user might have many repos)
 
-- [ ] **Add Octokit.NET package**:
+- [x] **Add Octokit.NET package**:
   ```powershell
   dotnet add src/DevMetricsPro.Infrastructure package Octokit
   ```
 
-**✅ Test**: Call service method - should return list of repositories
+**✅ Test**: Call service method - should return list of repositories ✅
 
 ---
 
-### Step 2.3.2: Create API Endpoint
+### Step 2.3.2: Create API Endpoint ✅
 
-- [ ] **Add to `GitHubController`**:
-  - GET /api/github/repositories - List connected repos
-  - POST /api/github/repositories/sync - Trigger sync
+- [x] **Add to `GitHubController`**:
+  - POST /api/github/sync-repositories - Trigger sync
 
-- [ ] **Implement sync logic**:
+- [x] **Implement sync logic**:
   - Get user's GitHub token from database
   - Call GitHubRepositoryService
-  - Save to Repository table
-  - Link to current user
+  - Save to Repository table (upsert logic)
+  - Return synced repository count and data
 
 **✅ Test**:
-- Call sync endpoint
-- Check database - repositories should be saved
-- Verify foreign keys link to user
+- Call sync endpoint ✅
+- Check database - repositories should be saved ✅
+- Verified 36 repositories synced from GitHub ✅
 
 ---
 
@@ -193,7 +191,7 @@ Each phase builds on the previous, allowing incremental testing and validation.
 - See list of GitHub repositories
 - Sync button fetches latest
 
-**Time Estimate**: 3-4 hours
+**Time Estimate**: 3-4 hours (Step 2.3.1-2.3.2 completed, 2.3.3 deferred)
 
 ---
 
