@@ -24,6 +24,7 @@ This 5-minute guide tells you:
 ├── README.md                    ← YOU ARE HERE
 ├── setups/                      ← Project documentation
 │   ├── AI-QUICKSTART.md        ← **START HERE** (5 min read)
+│   ├── PROJECT-STRUCTURE.md    ← **IMPORTANT** Complete codebase map
 │   ├── WORKFLOW-GUIDE.md       ← How we work together
 │   ├── prd.md                  ← Product requirements
 │   ├── project-idea.md         ← Original project concept
@@ -54,16 +55,21 @@ Read these to understand what you're working on:
 1. **[`setups/AI-QUICKSTART.md`](setups/AI-QUICKSTART.md)** (5 min)
    - Current status, what's done, what's next
 
-2. **[`setups/WORKFLOW-GUIDE.md`](setups/WORKFLOW-GUIDE.md)** (10 min)
+2. **[`setups/PROJECT-STRUCTURE.md`](setups/PROJECT-STRUCTURE.md)** (10 min) ⚠️ **CRITICAL**
+   - Complete project structure map
+   - All existing DTOs, services, entities, pages
+   - Check BEFORE implementing ANYTHING to avoid duplication
+
+3. **[`setups/WORKFLOW-GUIDE.md`](setups/WORKFLOW-GUIDE.md)** (10 min)
    - How user and AI collaborate
    - Git workflow
    - Issue creation process
 
-3. **Current Sprint Log** (5 min)
+4. **Current Sprint Log** (5 min)
    - `sprints/sprint2/sprint-log.md` (if exists)
    - Shows what's been done in current sprint
 
-4. **[`.cursor/rules.md`](../.cursor/rules.md)** (10 min)
+5. **[`.cursor/rules.md`](../.cursor/rules.md)** (10 min)
    - Core principles
    - Naming conventions
    - Architecture rules
@@ -143,6 +149,7 @@ Read these to understand what you're working on:
 - `sprints/sprint2/sprint-plan.md` - What needs to be done
 
 ### Frequently Referenced:
+- **`setups/PROJECT-STRUCTURE.md`** - ⚠️ **CHECK FIRST** before implementing!
 - `.cursor/rules.md` - Core conventions
 - `setups/WORKFLOW-GUIDE.md` - How we work
 - `setups/prd.md` - What we're building
