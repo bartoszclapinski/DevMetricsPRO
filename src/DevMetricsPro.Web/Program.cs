@@ -81,7 +81,7 @@ try
     builder.Services.AddHttpClient(); // Required for HttpClientFactory
     builder.Services.AddScoped<IGitHubOAuthService, GitHubOAuthService>();
     builder.Services.AddScoped<IGitHubRepositoryService, GitHubRepositoryService>();
-
+    builder.Services.AddScoped<IGitHubCommitsService, GitHubCommitsService>();
 
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
