@@ -174,23 +174,45 @@ DevMetricsPRO/
 
 | File | Route | Purpose | Status |
 |------|-------|---------|--------|
-| `Components/Pages/Home.razor` | `/` | Dashboard with stats and GitHub connection | ✅ Working |
+| `Components/Pages/Home.razor` | `/` | Dashboard with stats and GitHub connection | ✅ Working (Redesigned) |
 | `Components/Pages/Login.razor` | `/login` | User login | ✅ Working |
 | `Components/Pages/Register.razor` | `/register` | User registration | ✅ Working |
-| `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36 repos) | ✅ Working |
+| `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36 repos) | ✅ Working (Redesigned) |
 | `Components/Pages/Test.razor` | `/test` | Test page for development | ✅ Working |
 | `Components/Pages/Weather.razor` | `/weather` | Demo page | ✅ Working |
 | `Components/Pages/Counter.razor` | `/counter` | Demo page | ✅ Working |
 | `Components/Pages/Error.razor` | `/error` | Error page | ✅ Working |
 
+### Layout Components (NEW - Sprint 2)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Components/Layout/MainLayout.razor` | Main app layout wrapper | ✅ Working (Redesigned) |
+| `Components/Layout/TopNav.razor` | Horizontal navigation bar with tabs | ✅ Working |
+| `Components/Layout/ControlPanel.razor` | Filters and action buttons | ✅ Working |
+
+### Shared/Reusable Components (NEW - Sprint 2)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Components/Shared/MetricCard.razor` | Display metrics with value, label, trend | ✅ Working |
+| `Components/Shared/DataPanel.razor` | Generic panel container with header | ✅ Working |
+| `Components/Shared/DataTable.razor` | Generic table component with templates | ✅ Working |
+| `Components/Shared/StatusBadge.razor` | Colored status indicators | ✅ Working |
+
+### Stylesheets (NEW - Sprint 2)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `wwwroot/css/design-system.css` | Design tokens, color palette, core styles | ✅ Complete |
+
 **📝 Note**: `/developers`, `/metrics`, `/settings` pages not yet created
 
-### Layout Components
+### Other Layout Files
 
 | File | Purpose |
 |------|---------|
-| `Components/Layout/MainLayout.razor` | Main layout with header, sidebar, authentication |
-| `Components/Layout/NavMenu.razor` | Navigation menu with links |
+| `Components/Layout/NavMenu.razor` | Legacy navigation menu (may be removed) |
 | `Components/App.razor` | Root Blazor app component |
 | `Components/Routes.razor` | Route configuration |
 | `Components/_Imports.razor` | Global using statements for components |
