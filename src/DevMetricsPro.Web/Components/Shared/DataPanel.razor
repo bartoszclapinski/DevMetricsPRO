@@ -1,0 +1,39 @@
+@* Professional data panel component with header and actions *@
+
+<div class="panel">
+    <div class="panel-header">
+        <div class="panel-title">@Title</div>
+        
+        @if (Actions != null)
+        {
+            <div class="panel-actions">
+                @Actions
+            </div>
+        }
+    </div>
+    
+    <div class="panel-body">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The title displayed in the panel header
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// The main content of the panel
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+    
+    /// <summary>
+    /// Optional action buttons in the header (e.g., Export, Refresh)
+    /// </summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+}
+

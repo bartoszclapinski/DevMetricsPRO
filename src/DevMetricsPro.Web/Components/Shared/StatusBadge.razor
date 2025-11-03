@@ -1,0 +1,46 @@
+@* Professional status badge component *@
+
+<span class="table-badge @GetBadgeClass()">
+    @Text
+</span>
+
+@code {
+    /// <summary>
+    /// The text to display in the badge
+    /// </summary>
+    [Parameter]
+    public string Text { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// The status type (affects color)
+    /// </summary>
+    [Parameter]
+    public StatusType Type { get; set; } = StatusType.Info;
+    
+    /// <summary>
+    /// Gets CSS class based on status type
+    /// </summary>
+    private string GetBadgeClass()
+    {
+        return Type switch
+        {
+            StatusType.Success => "badge-success",
+            StatusType.Warning => "badge-warning",
+            StatusType.Danger => "badge-danger",
+            StatusType.Info => "badge-info",
+            _ => "badge-info"
+        };
+    }
+    
+    /// <summary>
+    /// Status type enum
+    /// </summary>
+    public enum StatusType
+    {
+        Success,
+        Warning,
+        Danger,
+        Info
+    }
+}
+
