@@ -78,8 +78,11 @@ DevMetricsPRO/
 | `DTOs/GitHub/GitHubOAuthResponse.cs` | OAuth response | AccessToken, TokenType, GitHubUsername, GitHubUserId |
 | `DTOs/GitHub/GitHubCallbackRequest.cs` | OAuth callback | Code, State |
 | `DTOs/GitHub/GitHubRepositoryDto.cs` | **✅ REPOSITORY DATA** | Id, Name, Description, HtmlUrl, IsPrivate, IsFork, StargazersCount, ForksCount, OpenIssuesCount, Language, CreatedAt, UpdatedAt, PushedAt |
+| `DTOs/GitHub/GitHubCommitDto.cs` | **✅ COMMIT DATA** (Phase 2.4) | Sha, Message, AuthorName, AuthorEmail, CommitterName, CommitterEmail, CommittedAt, AuthorDate, HtmlUrl, Additions, Deletions, TotalChanges, RepositoryName |
 
-**⚠️ IMPORTANT**: `GitHubRepositoryDto` is the **ONLY** repository DTO. Use this for all UI and API interactions!
+**⚠️ IMPORTANT**: 
+- `GitHubRepositoryDto` is the **ONLY** repository DTO. Use this for all UI and API interactions!
+- `GitHubCommitDto` is the **ONLY** commit DTO. Use this for all commit-related UI and API interactions!
 
 ### Service Interfaces
 
@@ -88,8 +91,9 @@ DevMetricsPRO/
 | `Interfaces/IJwtService.cs` | `GenerateToken()`, `GenerateRefreshToken()` | JWT token generation |
 | `Interfaces/IGitHubOAuthService.cs` | `GetAuthorizationUrl()`, `ExchangeCodeForTokenAsync()` | GitHub OAuth flow |
 | `Interfaces/IGitHubRepositoryService.cs` | `GetUserRepositoriesAsync()` | Fetch repos from GitHub API |
+| `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API (Phase 2.4) ✅ |
 
-**📝 Note**: No commit or PR service interfaces yet (coming in Phase 2.4+)
+**📝 Note**: No PR service interface yet (coming in Phase 2.6)
 
 ---
 
@@ -129,8 +133,9 @@ DevMetricsPRO/
 | `Services/JwtService.cs` | `IJwtService` | JWT token generation with claims |
 | `Services/GitHubOAuthService.cs` | `IGitHubOAuthService` | GitHub OAuth token exchange |
 | `Services/GitHubRepositoryService.cs` | `IGitHubRepositoryService` | Fetch repos using Octokit.NET |
+| `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET (Phase 2.4) ✅ |
 
-**📝 Note**: No commit or PR services yet (coming in Phase 2.4+)
+**📝 Note**: No PR service yet (coming in Phase 2.6)
 
 ### Migrations
 
@@ -162,6 +167,8 @@ DevMetricsPRO/
 - ✅ `GET /api/github/callback` - OAuth callback
 - ✅ `GET /api/github/status` - Check GitHub connection
 - ✅ `POST /api/github/sync-repositories` - Sync repos from GitHub
+- ✅ `POST /api/github/commits/sync/{repositoryId}` - Sync commits for repository (Phase 2.4) ✅
+- ✅ `GET /api/github/commits/recent?limit=10` - Get recent commits (Phase 2.4) ✅
 
 ### Blazor Pages
 
@@ -265,7 +272,6 @@ DevMetricsPRO/
 ### ✅ OK TO CREATE:
 
 **Services (not yet implemented):**
-- `IGitHubCommitsService` - For Phase 2.4
 - `IGitHubPullRequestService` - For Phase 2.6
 - `IMetricsCalculationService` - For Phase 2.7
 

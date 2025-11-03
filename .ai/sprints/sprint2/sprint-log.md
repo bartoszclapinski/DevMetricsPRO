@@ -494,17 +494,121 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
-### Day 5 - __________
+### Day 5 - November 3, 2025
 **Phases completed**:
-- [ ] Phase 2.4: Commits Sync
+- ✅ Phase 2.4: Commits Sync (All 4 sub-phases!)
+  - ✅ 2.4.1: DTOs & Service Interface (#56)
+  - ✅ 2.4.2: Service Implementation (#58)
+  - ✅ 2.4.3: API Endpoint (#57)
+  - ✅ 2.4.4: Dashboard Display (#59)
 
 **What I learned**:
-- 
-- 
+- **Breaking Large Tasks Into Small Commits**: Successfully broke Phase 2.4 into 4 focused sub-phases
+  - Each sub-phase = one focused PR (easier to review, easier to rollback)
+  - Sub-phase 1: Define contracts (DTOs + interfaces)
+  - Sub-phase 2: Implement business logic (service)
+  - Sub-phase 3: Expose via API (controller endpoint)
+  - Sub-phase 4: Display in UI (Blazor component)
+  - This pattern works great for complex features!
+  
+- **Octokit Commit API**: 
+  - `client.Repository.Commit.GetAll()` fetches commits
+  - `CommitRequest` with `Since` parameter enables incremental sync
+  - Commit stats: Additions, Deletions, Total (lines changed)
+  - Author vs Committer distinction (we used Committer)
+  
+- **Upsert Pattern in EF Core**:
+  - Check if entity exists by unique key (SHA for commits)
+  - If exists: update properties, call `UpdateAsync()`
+  - If not: create new entity, call `AddAsync()`
+  - Prevents duplicate commits on re-sync
+  
+- **Developer Auto-Creation**:
+  - Commits reference developers by email
+  - If developer not found in DB, create automatically
+  - Link developer to commit via `DeveloperId` foreign key
+  - Temporary GitHub username from email prefix
+  
+- **Incremental Sync Strategy**:
+  - Track `LastSyncedAt` on Repository entity
+  - Pass `Since` date to GitHub API
+  - Only fetch commits after last sync
+  - Update `LastSyncedAt` after successful sync
+  - Significantly reduces API calls and processing time
+  
+- **Real-Time Dashboard Updates**:
+  - `LoadRecentCommitsAsync()` called on page load
+  - Fetches from database (not GitHub API)
+  - Dashboard reflects latest synced data
+  - Total commit count updates dynamically
+  - Recent activity feed shows last 10 commits
+  
+- **Helper Methods for UI**:
+  - `GetRelativeTime()` converts DateTime to "2 hours ago"
+  - Improves UX with human-readable dates
+  - Pattern: < 1 min, < 60 min, < 24 hours, < 30 days, else full date
 
-**Time spent**: ___ hours  
-**Week 1 total**: ~__ hours  
+**Challenges:**
+- **Git Branch State Confusion**: Files reverted to old version unexpectedly
+  - Problem: Was on wrong branch, changes appeared lost
+  - Solution: Switched to correct feature branch, changes were there
+  - Lesson: Always verify current branch with `git status`
+  
+- **Breaking Down Complex Features**: Initial Phase 2.4 felt too large
+  - Problem: Would result in massive commit touching many files
+  - Solution: Broke into 4 sub-phases (DTOs → Service → API → UI)
+  - Each sub-phase = focused PR with clear scope
+  - Much easier to review and test incrementally
+
+**Testing:**
+- ✅ **Phase 2.4.1**: DTOs and interfaces compile with no errors
+- ✅ **Phase 2.4.2**: GitHubCommitsService successfully fetches commits
+  - Tested with `bartoszclapinski/DevMetricsPRO` repository
+  - Correctly maps Octokit `GitHubCommit` to `GitHubCommitDto`
+  - Error handling for 404, authorization, rate limits
+- ✅ **Phase 2.4.3**: API endpoint saves commits to database
+  - POST /api/github/commits/sync/{repositoryId}
+  - Upsert logic: updates existing commits, adds new ones
+  - Auto-creates developers if not found
+  - Returns counts: added, updated, total
+  - Incremental sync works (uses `LastSyncedAt`)
+- ✅ **Phase 2.4.4**: Dashboard displays real commit data
+  - GET /api/github/commits/recent endpoint works
+  - Total Commits stat card shows actual count from DB
+  - Recent Activity displays last 10 commits with:
+    - Commit message (truncated to 50 chars)
+    - Author name and repository name
+    - Relative time ("2 hours ago")
+  - Empty state displays when no commits
+  - Loading on page initialization works correctly
+- ✅ All builds successful: 0 errors, 0 warnings
+- ✅ No linter errors across all files
+
+**Documentation:**
+- ✅ Created 4 GitHub issues (#56, #57, #58, #59) - one per sub-phase
+- ✅ Each issue has focused, checklist-based description
+- ✅ All issues closed with successful PR merges
+- ✅ Commits follow Conventional Commits format
+
+**Time spent**: ~4 hours  
+**Week 1 total**: ~15 hours  
+**Blockers**: None  
 **Notes**: 
+- 🎉 **PHASE 2.4 COMPLETE!** All 4 sub-phases done!
+- Dashboard now shows real commit data synced from GitHub
+- Incremental sync reduces API calls (only fetches new commits)
+- Breaking into sub-phases was the right decision:
+  - Issue #56: DTOs & Interface (15 min)
+  - Issue #58: Service Implementation (45 min)
+  - Issue #57: API Endpoint (1 hour)
+  - Issue #59: Dashboard Display (1.5 hours)
+- Week 1 of Sprint 2 exceeded expectations: 4 phases complete!
+- Clean Architecture pattern is working beautifully:
+  - Core: Entities (Commit, Developer)
+  - Application: DTOs, Service interfaces
+  - Infrastructure: Service implementations (Octokit)
+  - Web: Controllers (API), Components (UI)
+- Ready for Week 2: Background jobs with Hangfire! 
 
 ---
 
