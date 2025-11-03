@@ -201,60 +201,90 @@ Each phase builds on the previous, allowing incremental testing and validation.
 
 ---
 
-## Phase 2.4: Commits Sync (Day 5-6)
+## Phase 2.4: Commits Sync (Day 5) ✅ **COMPLETE**
 
 **Goal**: Fetch and store commits for each repository
 
-### Step 2.4.1: Create Commits Service
+### Step 2.4.1: Create Commits DTOs & Service Interface ✅
 
-- [ ] **Create `IGitHubCommitsService`**:
+- ✅ **Created `GitHubCommitDto`** in `Application/DTOs/GitHub/`:
+  - SHA, Message, Author/Committer details
+  - Committed/Author dates, HTML URL
+  - Line stats: Additions, Deletions, TotalChanges
+  - Repository name
+
+- ✅ **Created `IGitHubCommitsService`**:
   ```csharp
-  Task<IEnumerable<CommitDto>> GetRepositoryCommitsAsync(string owner, string repo, string accessToken);
-  Task SyncCommitsForRepositoryAsync(Guid repositoryId, CancellationToken cancellationToken);
-  Task SyncAllCommitsAsync(Guid userId, CancellationToken cancellationToken);
+  Task<IEnumerable<GitHubCommitDto>> GetRepositoryCommitsAsync(
+      string owner, string repo, string accessToken, 
+      DateTime? since = null, CancellationToken cancellationToken = default);
   ```
 
-- [ ] **Implement service**:
-  - Fetch commits using Octokit
-  - Map to Commit entity
-  - Handle pagination (repos can have thousands of commits)
-  - Store author info (link to Developer if exists)
-  - Store commit metadata (additions, deletions, files changed)
-
-**✅ Test**: Service method returns commits for a repository
+**Issue**: #56 | **Branch**: `sprint2/phase2.4.1-commits-dtos-#56`
 
 ---
 
-### Step 2.4.2: Add Sync Logic
+### Step 2.4.2: Implement Commits Service ✅
 
-- [ ] **Implement incremental sync**:
-  - Track last sync date per repository
-  - Only fetch commits since last sync
-  - Avoid duplicate commits (check SHA)
+- ✅ **Implemented `GitHubCommitsService`** in Infrastructure:
+  - Fetches commits using Octokit `client.Repository.Commit.GetAll()`
+  - Maps `GitHubCommit` to `GitHubCommitDto`
+  - Supports incremental sync with `since` parameter
+  - Error handling: NotFoundException, AuthorizationException, RateLimitExceededException
+  - Comprehensive logging
 
-- [ ] **Add to `GitHubController`**:
+- ✅ **Registered in DI** (`Program.cs`)
+
+**✅ Test**: Service successfully fetches commits from GitHub API
+
+**Issue**: #58 | **Branch**: `sprint2/phase2.4.2-commits-service-#58`
+
+---
+
+### Step 2.4.3: Add API Endpoint with Sync Logic ✅
+
+- ✅ **Implemented incremental sync in `GitHubController`**:
   - POST /api/github/commits/sync/{repositoryId}
-  - POST /api/github/commits/sync-all
+  - Tracks `LastSyncedAt` per repository
+  - Fetches commits since last sync
+  - Upsert logic: updates existing, adds new (checks SHA)
+  - Auto-creates Developer entities if not found
+  - Returns counts: added, updated, total
 
 **✅ Test**:
-- Sync commits for one repository
-- Check database - commits should be saved
-- Re-sync - should only fetch new commits
+- ✅ Syncs commits for repository
+- ✅ Database stores commits correctly
+- ✅ Re-sync only fetches new commits
+- ✅ Upsert logic prevents duplicates
+
+**Issue**: #57 | **Branch**: `sprint2/phase2.4.3-commits-api-#57`
 
 ---
 
-### Step 2.4.3: Display Commit Activity
+### Step 2.4.4: Display Commit Activity ✅
 
-- [ ] **Update `Home.razor` dashboard**:
-  - Show recent commits feed
-  - Display: commit message, author, date, repo
-  - Add commit count stat card
+- ✅ **Updated `Home.razor` dashboard**:
+  - Shows recent commits feed (last 10)
+  - Displays: commit message (truncated), author, repo, relative time
+  - Total Commits stat card shows real count from DB
+  - Empty state when no commits
+  - Loads on page initialization
+
+- ✅ **Added GET endpoint**:
+  - GET /api/github/commits/recent?limit=10
+  - Fetches from database
 
 **✅ Test**:
-- Dashboard shows recent commits
-- Stats update after sync
+- ✅ Dashboard shows real commit data
+- ✅ Stats update dynamically
+- ✅ Recent Activity displays correctly
 
-**Time Estimate**: 4-5 hours
+**Issue**: #59 | **Branch**: `sprint2/phase2.4.4-commits-dashboard-#59`
+
+---
+
+**Time Spent**: ~4 hours (4 sub-phases)  
+**Status**: ✅ **100% COMPLETE**
 
 ---
 
