@@ -4,52 +4,33 @@
 @inject NavigationManager Navigation
 @implements IDisposable
 
+<!-- Keep MudBlazor providers for forms, dialogs, and snackbars -->
 <MudThemeProvider />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="1" Dense="true">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
-                       Color="Color.Inherit" 
-                       Edge="Edge.Start" 
-                       OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h6" Class="ml-3">DevMetrics Pro</MudText>
-        <MudSpacer />
-        
-        @if (_isAuthenticated)
-        {
-            <MudText Typo="Typo.body2" Class="mr-4">
-                @_userEmail
-            </MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.Logout" 
-                           Color="Color.Inherit" 
-                           OnClick="HandleLogout" />
-        }
-        else
-        {
-            <MudButton Href="/login" 
-                       Variant="Variant.Text" 
-                       Color="Color.Inherit">
-               Login
-            </MudButton>
-        }
-    </MudAppBar>
+<!-- New custom layout with design system -->
+<TopNav IsAuthenticated="_isAuthenticated" 
+        UserEmail="_userEmail" 
+        OnLogout="HandleLogout" />
 
-    @if (_drawerOpen)
-    {
-        <MudPaper Elevation="1" Style="width: 240px; min-height: 100vh; position: fixed; left: 0; top: 64px; z-index: 1200;">
-            <NavMenu />
-        </MudPaper>
-    }
+@if (_isAuthenticated && _showControlPanel)
+{
+    <ControlPanel Repositories="_repositories"
+                  SelectedRepository="_selectedRepository"
+                  SelectedTeam="_selectedTeam"
+                  SelectedTimeRange="_selectedTimeRange"
+                  OnRepositoryChanged="HandleRepositoryChanged"
+                  OnTeamChanged="HandleTeamChanged"
+                  OnTimeRangeChanged="HandleTimeRangeChanged"
+                  OnExportCSV="HandleExportCSV"
+                  OnSettings="HandleSettings" />
+}
 
-    <MudMainContent Style="@(_drawerOpen ? "margin-left: 240px;" : "")">
-        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+<div class="dashboard-container">
+    @Body
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -58,9 +39,15 @@
 </div>
 
 @code {
-    private bool _drawerOpen = true;
     private bool _isAuthenticated = false;
     private string _userEmail = string.Empty;
+    private bool _showControlPanel = true; // Show control panel on authenticated pages
+    
+    // Control panel state
+    private List<string> _repositories = new();
+    private string _selectedRepository = string.Empty;
+    private string _selectedTeam = string.Empty;
+    private string _selectedTimeRange = "7D";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -81,6 +68,11 @@
     {
         // Re-check auth state whenever navigation happens
         await LoadAuthState();
+        
+        // Hide control panel on login/register pages
+        var currentPath = new Uri(Navigation.Uri).AbsolutePath.ToLower();
+        _showControlPanel = !currentPath.Contains("/login") && !currentPath.Contains("/register");
+        
         StateHasChanged();
     }
 
@@ -107,11 +99,6 @@
         }
     }
 
-    private void ToggleDrawer()
-    {
-        _drawerOpen = !_drawerOpen;
-    }
-
     private async Task HandleLogout()
     {
         await AuthState.RemoveTokenAsync();
@@ -119,6 +106,40 @@
         _userEmail = string.Empty;
         StateHasChanged();
         Navigation.NavigateTo("/login");
+    }
+    
+    // Control panel event handlers
+    private Task HandleRepositoryChanged(string repository)
+    {
+        _selectedRepository = repository;
+        // TODO: Filter data by repository
+        return Task.CompletedTask;
+    }
+    
+    private Task HandleTeamChanged(string team)
+    {
+        _selectedTeam = team;
+        // TODO: Filter data by team
+        return Task.CompletedTask;
+    }
+    
+    private Task HandleTimeRangeChanged(string timeRange)
+    {
+        _selectedTimeRange = timeRange;
+        // TODO: Filter data by time range
+        return Task.CompletedTask;
+    }
+    
+    private Task HandleExportCSV()
+    {
+        // TODO: Implement CSV export
+        return Task.CompletedTask;
+    }
+    
+    private Task HandleSettings()
+    {
+        Navigation.NavigateTo("/settings");
+        return Task.CompletedTask;
     }
 
     public void Dispose()

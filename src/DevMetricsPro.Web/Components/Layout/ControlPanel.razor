@@ -1,0 +1,91 @@
+<div class="control-panel">
+    <div class="control-group">
+        <label class="control-label">Repository</label>
+        <select class="control-select" @bind="SelectedRepository">
+            <option value="">All Repositories</option>
+            @foreach (var repo in Repositories)
+            {
+                <option value="@repo">@repo</option>
+            }
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <label class="control-label">Team</label>
+        <select class="control-select" @bind="SelectedTeam">
+            <option value="">All Teams</option>
+            <option value="Backend">Backend</option>
+            <option value="Frontend">Frontend</option>
+            <option value="DevOps">DevOps</option>
+            <option value="QA">QA</option>
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <label class="control-label">Time Range</label>
+        <div class="time-presets">
+            <button class="time-preset @GetActiveTimeClass("1H")" @onclick="@(() => SelectTimeRange("1H"))">1H</button>
+            <button class="time-preset @GetActiveTimeClass("6H")" @onclick="@(() => SelectTimeRange("6H"))">6H</button>
+            <button class="time-preset @GetActiveTimeClass("1D")" @onclick="@(() => SelectTimeRange("1D"))">1D</button>
+            <button class="time-preset @GetActiveTimeClass("7D")" @onclick="@(() => SelectTimeRange("7D"))">7D</button>
+            <button class="time-preset @GetActiveTimeClass("30D")" @onclick="@(() => SelectTimeRange("30D"))">30D</button>
+            <button class="time-preset @GetActiveTimeClass("90D")" @onclick="@(() => SelectTimeRange("90D"))">90D</button>
+            <button class="time-preset @GetActiveTimeClass("1Y")" @onclick="@(() => SelectTimeRange("1Y"))">1Y</button>
+        </div>
+    </div>    
+    <div class="control-group" style="margin-left: auto;">
+        <button class="panel-action" @onclick="HandleExportCSV">Export CSV</button>
+        <button class="panel-action" @onclick="HandleSettings">Settings</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public List<string> Repositories { get; set; } = new();
+    
+    [Parameter]
+    public string SelectedRepository { get; set; } = string.Empty;
+    
+    [Parameter]
+    public string SelectedTeam { get; set; } = string.Empty;
+    
+    [Parameter]
+    public string SelectedTimeRange { get; set; } = "7D";
+    
+    [Parameter]
+    public EventCallback<string> OnRepositoryChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback<string> OnTeamChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback<string> OnTimeRangeChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback OnExportCSV { get; set; }
+    
+    [Parameter]
+    public EventCallback OnSettings { get; set; }
+    
+    private string GetActiveTimeClass(string timeRange)
+    {
+        return SelectedTimeRange == timeRange ? "active" : string.Empty;
+    }
+    
+    private async Task SelectTimeRange(string timeRange)
+    {
+        SelectedTimeRange = timeRange;
+        await OnTimeRangeChanged.InvokeAsync(timeRange);
+    }
+    
+    private async Task HandleExportCSV()
+    {
+        await OnExportCSV.InvokeAsync();
+    }
+    
+    private async Task HandleSettings()
+    {
+        await OnSettings.InvokeAsync();
+    }
+}
+

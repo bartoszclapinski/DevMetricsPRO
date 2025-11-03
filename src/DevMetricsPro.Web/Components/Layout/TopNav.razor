@@ -1,0 +1,75 @@
+@using DevMetricsPro.Web.Services
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<nav class="top-nav">
+    <div class="nav-brand">
+        <div class="nav-logo">DM</div>
+        <div class="nav-title">DevMetrics Analytics</div>
+    </div>
+    
+    <div class="nav-tabs">
+        <a href="/" class="nav-tab @GetActiveClass("/")">Overview</a>
+        <a href="/repositories" class="nav-tab @GetActiveClass("/repositories")">Repositories</a>
+        <a href="/contributors" class="nav-tab @GetActiveClass("/contributors")">Contributors</a>
+        <a href="/pull-requests" class="nav-tab @GetActiveClass("/pull-requests")">Pull Requests</a>
+        <a href="/issues" class="nav-tab @GetActiveClass("/issues")">Issues</a>
+        <a href="/reports" class="nav-tab @GetActiveClass("/reports")">Reports</a>
+    </div>
+    
+    <div class="nav-actions">
+        <div class="nav-status">
+            <span class="status-indicator"></span>
+            <span>Live</span>
+        </div>
+        
+        @if (IsAuthenticated)
+        {
+            <select class="control-select">
+                <option>Workspace: Engineering</option>
+                <option>Workspace: DevOps</option>
+                <option>Workspace: QA</option>
+            </select>
+            
+            <button class="panel-action" @onclick="HandleLogout" title="Logout (@UserEmail)">
+                Logout
+            </button>
+        }
+        else
+        {
+            <a href="/login" class="panel-action" style="text-decoration: none;">Login</a>
+        }
+    </div>
+</nav>
+
+@code {
+    [Parameter]
+    public bool IsAuthenticated { get; set; }
+    
+    [Parameter]
+    public string UserEmail { get; set; } = string.Empty;
+    
+    [Parameter]
+    public EventCallback OnLogout { get; set; }
+    
+    private string GetActiveClass(string path)
+    {
+        var currentPath = new Uri(Navigation.Uri).AbsolutePath;
+        
+        // Exact match for home page
+        if (path == "/" && currentPath == "/")
+            return "active";
+        
+        // Prefix match for other pages
+        if (path != "/" && currentPath.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+            return "active";
+        
+        return string.Empty;
+    }
+    
+    private async Task HandleLogout()
+    {
+        await OnLogout.InvokeAsync();
+    }
+}
+
