@@ -10,197 +10,129 @@
 
 @if (!_isAuthenticated)
 {
-    <MudText Typo="Typo.h4" Class="mb-4">Welcome to DevMetrics Pro</MudText>
-    <MudText Typo="Typo.body1" Class="mb-4">
-        A real-time developer analytics platform for tracking team productivity and code quality.
-    </MudText>
-    <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large">
-        Get Started
-    </MudButton>
+    <div style="text-align: center; padding: 60px 20px;">
+        <h1 style="font-size: 32px; margin-bottom: 16px; color: var(--text-primary);">Welcome to DevMetrics Pro</h1>
+        <p style="font-size: 16px; margin-bottom: 24px; color: var(--text-secondary);">
+            A real-time developer analytics platform for tracking team productivity and code quality.
+        </p>
+        <a href="/login" class="panel-action" style="padding: 12px 24px; font-size: 16px; text-decoration: none; display: inline-block;">
+            Get Started
+        </a>
+    </div>
 }
 else
 {
-    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
-    
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2">
-                <MudCardContent>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Commits</MudText>
-                            <MudText Typo="Typo.h4">@_totalCommits</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +12.5% from last week
-                            </MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Large" Color="Color.Primary" />
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+        <MetricCard 
+            Label="Total Commits" 
+            Value="@_totalCommits.ToString("N0")" 
+            Change="+12.5% from last week"
+            Trend="MetricCard.TrendDirection.Up" />
+        
+        <MetricCard 
+            Label="Pull Requests" 
+            Value="89" 
+            Change="+8.3% from last week"
+            Trend="MetricCard.TrendDirection.Up" />
+        
+        <MetricCard 
+            Label="Active Developers" 
+            Value="24" 
+            Change="+2 this month"
+            Trend="MetricCard.TrendDirection.Up" />
+        
+        <MetricCard 
+            Label="Code Reviews" 
+            Value="156" 
+            Change="+15.2% from last week"
+            Trend="MetricCard.TrendDirection.Up" />
+    </div>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2">
-                <MudCardContent>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pull Requests</MudText>
-                            <MudText Typo="Typo.h4">89</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +8.3% from last week
-                            </MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.MergeType" Size="Size.Large" Color="Color.Secondary" />
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
+    <!-- Panels Grid -->
+    <div class="panel-grid" style="margin-top: 24px;">
+        <DataPanel Title="Activity Overview">
+            <div style="text-align: center; padding: 60px 20px; color: var(--text-tertiary);">
+                <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+                <div style="font-size: 14px;">Chart visualization will be implemented in Sprint 3</div>
+            </div>
+        </DataPanel>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2">
-                <MudCardContent>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Active Developers</MudText>
-                            <MudText Typo="Typo.h4">24</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +2 this month
-                            </MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Tertiary" />
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2">
-                <MudCardContent>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Code Reviews</MudText>
-                            <MudText Typo="Typo.h4">156</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
-                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +15.2% from last week
-                            </MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Info" />
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-
-    <MudGrid Class="mt-4">
-        <MudItem xs="12" md="8">
-            <MudCard Elevation="2">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Activity Overview</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="py-8">
-                        <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
-                        <br />
-                        Chart visualization will be implemented in Sprint 3
-                    </MudText>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-
-        <MudItem xs="12" md="4">
-            <MudCard Elevation="2">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Recent Activity</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudList T="string" Dense="true">
-                        @if (_recentCommits.Any())
-                        {
-                            @foreach (var commit in _recentCommits)
-                            {
-                                <MudListItem T="string" Icon="@Icons.Material.Filled.Code">
-                                    <MudText Typo="Typo.body2">
-                                        @(commit.Message.Length > 50 ? commit.Message.Substring(0, 50) + "..." : commit.Message)
-                                    </MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @commit.AuthorName in @commit.RepositoryName • @GetRelativeTime(commit.CommittedAt)
-                                    </MudText>
-                                </MudListItem>
-                            }
-                        }
-                        else
-                        {
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">No commits yet</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Sync your repositories to see commits</MudText>
-                            </MudListItem>
-                        }
-                    </MudList>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
+        <DataPanel Title="Recent Activity">
+            @if (_recentCommits.Any())
+            {
+                <DataTable TItem="RecentCommitDto" Items="@_recentCommits">
+                    <TableHeader>
+                        <th>Commit</th>
+                        <th class="text-right">Time</th>
+                    </TableHeader>
+                    <RowTemplate>
+                        <td>
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 2px;">
+                                @(context.Message.Length > 40 ? context.Message.Substring(0, 40) + "..." : context.Message)
+                            </div>
+                            <div class="text-small text-muted">
+                                @context.AuthorName in @context.RepositoryName
+                            </div>
+                        </td>
+                        <td class="text-right text-small text-muted">
+                            @GetRelativeTime(context.CommittedAt)
+                        </td>
+                    </RowTemplate>
+                </DataTable>
+            }
+            else
+            {
+                <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
+                    <div style="font-size: 14px; margin-bottom: 4px;">No commits yet</div>
+                    <div style="font-size: 12px;">Sync your repositories to see commits</div>
+                </div>
+            }
+        </DataPanel>
+    </div>
 }
 
 @if (_isAuthenticated)
 {
-    <MudGrid Class="mt-4">
-        <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">
-                            <MudIcon Icon="@Icons.Custom.Brands.GitHub" Class="mr-2" />
-                            GitHub Integration
-                        </MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (!isGitHubConnected)
+    <div style="margin-top: 24px; max-width: 600px;">
+        <DataPanel Title="GitHub Integration">
+            @if (!isGitHubConnected)
+            {
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">
+                    Connect your GitHub account to sync repositories and track metrics.
+                </p>
+                <button class="panel-action" @onclick="ConnectGitHub" disabled="@isConnectingGitHub" 
+                        style="padding: 8px 16px; background: var(--text-primary); color: white; cursor: @(isConnectingGitHub ? "not-allowed" : "pointer");">
+                    @if (isConnectingGitHub)
                     {
-                        <MudText Typo="Typo.body2" Class="mb-3">
-                            Connect your GitHub account to sync repositories and track metrics.
-                        </MudText>
-                        <MudButton 
-                            Variant="Variant.Filled" 
-                            Color="Color.Dark" 
-                            StartIcon="@Icons.Custom.Brands.GitHub"
-                            OnClick="ConnectGitHub"
-                            Disabled="isConnectingGitHub">
-                            @if (isConnectingGitHub)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                <span>Connecting...</span>
-                            }
-                            else
-                            {
-                                <span>Connect GitHub</span>
-                            }
-                        </MudButton>
+                        <span>Connecting...</span>
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Success" Class="mb-3">
-                            ✓ Connected as <strong>@@@githubUsername</strong>
-                        </MudAlert>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            Your GitHub account is linked and ready to sync.
-                        </MudText>
+                        <span>Connect GitHub</span>
                     }
-                    
-                    @if (!string.IsNullOrEmpty(githubConnectedMessage))
-                    {
-                        <MudAlert Severity="Severity.Info" Class="mt-3">@githubConnectedMessage</MudAlert>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
+                </button>
+            }
+            else
+            {
+                <div style="padding: 12px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; margin-bottom: 16px;">
+                    <div style="color: var(--success); font-size: 14px;">
+                        ✓ Connected as <strong>@@@githubUsername</strong>
+                    </div>
+                </div>
+                <p style="font-size: 14px; color: var(--text-secondary);">
+                    Your GitHub account is linked and ready to sync.
+                </p>
+            }
+            
+            @if (!string.IsNullOrEmpty(githubConnectedMessage))
+            {
+                <div style="padding: 12px; background: rgba(3, 102, 214, 0.1); border-radius: 4px; margin-top: 16px;">
+                    <div style="color: var(--info); font-size: 14px;">@githubConnectedMessage</div>
+                </div>
+            }
+        </DataPanel>
+    </div>
 }
 
 @code {
