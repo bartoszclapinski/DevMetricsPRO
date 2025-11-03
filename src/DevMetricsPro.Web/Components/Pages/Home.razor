@@ -29,7 +29,7 @@ else
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div>
                             <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Commits</MudText>
-                            <MudText Typo="Typo.h4">1,247</MudText>
+                            <MudText Typo="Typo.h4">@_totalCommits</MudText>
                             <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-2">
                                 <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> +12.5% from last week
                             </MudText>
@@ -119,22 +119,27 @@ else
                 </MudCardHeader>
                 <MudCardContent>
                     <MudList T="string" Dense="true">
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.Code">
-                            <MudText Typo="Typo.body2">New commit by Sarah Chen</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">2 minutes ago</MudText>
-                        </MudListItem>
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.MergeType">
-                            <MudText Typo="Typo.body2">PR #142 merged</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">15 minutes ago</MudText>
-                        </MudListItem>
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.RateReview">
-                            <MudText Typo="Typo.body2">Code review completed</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">1 hour ago</MudText>
-                        </MudListItem>
-                        <MudListItem T="string" Icon="@Icons.Material.Filled.BugReport">
-                            <MudText Typo="Typo.body2">Issue #89 closed</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">3 hours ago</MudText>
-                        </MudListItem>
+                        @if (_recentCommits.Any())
+                        {
+                            @foreach (var commit in _recentCommits)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.Code">
+                                    <MudText Typo="Typo.body2">
+                                        @(commit.Message.Length > 50 ? commit.Message.Substring(0, 50) + "..." : commit.Message)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @commit.AuthorName in @commit.RepositoryName • @GetRelativeTime(commit.CommittedAt)
+                                    </MudText>
+                                </MudListItem>
+                            }
+                        }
+                        else
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">No commits yet</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Sync your repositories to see commits</MudText>
+                            </MudListItem>
+                        }
                     </MudList>
                 </MudCardContent>
             </MudCard>
@@ -200,6 +205,8 @@ else
 
 @code {
     private bool _isAuthenticated = false;
+    private int _totalCommits = 0;
+    private List<RecentCommitDto> _recentCommits = new();
     private bool isConnectingGitHub = false;
     private bool isGitHubConnected = false;
     private string? githubUsername;
@@ -212,6 +219,7 @@ else
         if (_isAuthenticated)
         {
             await CheckGitHubConnectionStatus();
+            await LoadRecentCommitsAsync();
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -253,47 +261,91 @@ else
     }
 
     private async Task ConnectGitHub()
-{
-    isConnectingGitHub = true;
-    
-    try
     {
-        var token = await AuthState.GetTokenAsync();
-        if (string.IsNullOrEmpty(token))
-        {
-            Snackbar.Add("Please login first", Severity.Warning);
-            return;
-        }
-
-        // Create request with Authorization header
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/authorize");
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        isConnectingGitHub = true;
         
-        var response = await Http.SendAsync(request);
-        if (response.IsSuccessStatusCode)
+        try
         {
-            var result = await response.Content.ReadFromJsonAsync<GitHubAuthResponse>();
-            if (result?.AuthorizationUrl != null)
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
             {
-                // Redirect to GitHub authorization page
-                Navigation.NavigateTo(result.AuthorizationUrl, forceLoad: true);
+                Snackbar.Add("Please login first", Severity.Warning);
+                return;
+            }
+
+            // Create request with Authorization header
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/authorize");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GitHubAuthResponse>();
+                if (result?.AuthorizationUrl != null)
+                {
+                    // Redirect to GitHub authorization page
+                    Navigation.NavigateTo(result.AuthorizationUrl, forceLoad: true);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to initiate GitHub connection", Severity.Error);
             }
         }
-        else
+        catch (Exception ex)
         {
-            Snackbar.Add("Failed to initiate GitHub connection", Severity.Error);
+            Logger.LogError(ex, "Error connecting to GitHub");
+            Snackbar.Add("Failed to connect to GitHub. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            isConnectingGitHub = false;
         }
     }
-    catch (Exception ex)
+
+    private async Task LoadRecentCommitsAsync()
     {
-        Logger.LogError(ex, "Error connecting to GitHub");
-        Snackbar.Add("Failed to connect to GitHub. Please try again.", Severity.Error);
+        try
+        {
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+                return;
+
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/commits/recent?limit=10");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<RecentCommitsResponse>();
+                if (result?.Success == true)
+                {
+                    _totalCommits = result.TotalCommits;
+                    _recentCommits = result.Commits ?? new List<RecentCommitDto>();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading recent commits");
+        }
     }
-    finally
+
+    private string GetRelativeTime(DateTime dateTime)
     {
-        isConnectingGitHub = false;
+        var timeSpan = DateTime.UtcNow - dateTime;
+        
+        if (timeSpan.TotalMinutes < 1)
+            return "just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes} minutes ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours} hours ago";
+        if (timeSpan.TotalDays < 30)
+            return $"{(int)timeSpan.TotalDays} days ago";
+        
+        return dateTime.ToString("MMM dd, yyyy");
     }
-}
 
     // Helper classes for deserializing API responses
     private class GitHubAuthResponse
@@ -306,5 +358,23 @@ else
         public bool Connected { get; set; }
         public string? Username { get; set; }
         public DateTime? ConnectedAt { get; set; }
+    }
+
+        private class RecentCommitsResponse
+    {
+        public bool Success { get; set; }
+        public int TotalCommits { get; set; }
+        public List<RecentCommitDto>? Commits { get; set; }
+    }
+
+    private class RecentCommitDto
+    {
+        public string Sha { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string AuthorName { get; set; } = string.Empty;
+        public DateTime CommittedAt { get; set; }
+        public string RepositoryName { get; set; } = string.Empty;
+        public int LinesAdded { get; set; }
+        public int LinesRemoved { get; set; }
     }
 }

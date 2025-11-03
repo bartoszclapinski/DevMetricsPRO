@@ -178,7 +178,7 @@ public class GitHubController : ControllerBase
             _logger.LogError(ex, "Error during GitHub OAuth callback");
             return Redirect("/?error=connection-failed");
         }
-    }
+    }    
 
     /// <summary>
     /// Test endpoint to check if GitHub integration is working
@@ -353,6 +353,63 @@ public class GitHubController : ControllerBase
         }   
         
     }
+
+    /// <summary>
+    /// Get recent commits across all repositories for the authenticated user
+    /// </summary>
+    [HttpGet("commits/recent")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRecentCommits(
+        [FromQuery] int limit = 10, 
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Get currently logged-in user
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new {error = "User not authenticated"});
+            }
+            
+            // Fetch recent commits from database
+            var commitRepo = _unitOfWork.Repository<Commit>();
+            var commits = await commitRepo.GetAllAsync(cancellationToken);
+
+            // Get most recent commits ordered byt date
+            var recentCommits = commits
+                .OrderByDescending(c => c.CommittedAt)
+                .Take(limit)
+                .Select(c => new
+                {
+                    sha = c.Sha,
+                    message = c.Message,
+                    authorName = c.Developer?.DisplayName ?? "Unknown Author Name",
+                    committedAt = c.CommittedAt,
+                    repositoryName = c.Repository?.Name ?? "Unknown Repository Name",
+                    linesAdded = c.LinesAdded,
+                    linesRemoved = c.LinesRemoved
+                })
+                .ToList();
+            
+            // Get total commit count
+            var totalCommits = commits.Count();
+
+            return Ok(new
+            {
+                success = true,
+                totalCommits = totalCommits,
+                recentCommits = recentCommits
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching recent commits");
+            return StatusCode(500, new { error = "Failed to fetch recent commits", detail = ex.Message });
+        }
+    }
+   
 
     /// <summary>
     /// Saves or updates repositories in the database
