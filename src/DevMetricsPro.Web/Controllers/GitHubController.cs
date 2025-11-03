@@ -22,18 +22,21 @@ public class GitHubController : ControllerBase
     private readonly ILogger<GitHubController> _logger;
     private readonly IGitHubRepositoryService _githubRepositoryService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IGitHubCommitsService _gitHubCommitsService;
 
     public GitHubController(IGitHubOAuthService gitHubOAuthService,
         UserManager<ApplicationUser> userManager,
         ILogger<GitHubController> logger,
         IGitHubRepositoryService githubRepositoryService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IGitHubCommitsService gitHubCommitsService)
     {
         _gitHubOAuthService = gitHubOAuthService ?? throw new ArgumentNullException(nameof(gitHubOAuthService));
         _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _githubRepositoryService = githubRepositoryService ?? throw new ArgumentNullException(nameof(githubRepositoryService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _gitHubCommitsService = gitHubCommitsService ?? throw new ArgumentNullException(nameof(gitHubCommitsService));
     }
 
     /// <summary>
@@ -257,12 +260,107 @@ public class GitHubController : ControllerBase
     }
 
     /// <summary>
-/// Saves or updates repositories in the database
-/// </summary>
-/// <param name="githubRepos">GitHub repository DTOs to save</param>
-/// <param name="user">Current application user</param>
-/// <param name="cancellationToken">Cancellation token</param>
-/// <returns>Tuple with (addedCount, updatedCount)</returns>
+    /// Sync commits for a specific repository
+    /// </summary>
+    [HttpPost("commits/sync/{repositoryId}")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SyncCommits(Guid repositoryId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Starting commit sync for repository {RepositoryId}", repositoryId);
+
+            // Get currently logged-in user
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new {error = "User not authenticated"});
+            }
+
+            // Get user from database
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new {error = "User not found"});
+            }
+
+            // Check if GitHub is connected
+            if (string.IsNullOrEmpty(user.GitHubAccessToken) || string.IsNullOrEmpty(user.GitHubUsername))
+            {
+                return BadRequest(new {error = "GitHub account not connected. Please connect your GitHub account first."});
+            }
+
+            // Get repository from database
+            var repositoryRepo = _unitOfWork.Repository<Repository>();
+            var repositories = await repositoryRepo.FindAsync(r => r.Id == repositoryId, cancellationToken);
+            var repository = repositories.FirstOrDefault();
+
+            if (repository == null)
+            {
+                return NotFound(new {error = "Repository not found"});
+            }
+
+            // Extract repository owner and repository name
+            var owner = user.GitHubUsername;
+            var repoName = repository.Name;
+
+            _logger.LogInformation("Fetching commits from GitHub repository {Owner}/{Repo}", owner, repoName);
+            
+            // Fetch commits from GitHub (only last 100 for MVP)
+            var githubCommits = await _gitHubCommitsService.GetRepositoryCommitsAsync(
+                owner,
+                repoName,
+                user.GitHubAccessToken,
+                since: repository.LastSyncedAt, // Incremental sync
+                cancellationToken);
+
+            // Save commits to database
+            var (addedCount, updatedCount) = await SaveCommitsToDatabaseAsync(
+                githubCommits, repository, cancellationToken);
+            
+            // Update repository last synced date
+            repository.LastSyncedAt = DateTime.UtcNow;
+            await repositoryRepo.UpdateAsync(repository, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                 "Successfully synced {Total} commits for repository {RepositoryId} ({Added} new, {Updated} updated)",
+                 addedCount + updatedCount, repositoryId, addedCount, updatedCount);
+
+            return Ok(new 
+            {
+                success = true,
+                repositoryId = repositoryId,
+                repositoryName = repoName,
+                addedCount = addedCount,
+                updatedCount = updatedCount,
+                totalCommits = addedCount + updatedCount
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "GitHub authorization failed during commit sync");
+            return Unauthorized(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing commits for repository {RepositoryId}", repositoryId);
+            return StatusCode(500, new { error = "Failed to sync commits", detail = ex.Message });
+        }   
+        
+    }
+
+    /// <summary>
+    /// Saves or updates repositories in the database
+    /// </summary>
+    /// <param name="githubRepos">GitHub repository DTOs to save</param>
+    /// <param name="user">Current application user</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Tuple with (addedCount, updatedCount)</returns>
     private async Task<(int addedCount, int updatedCount)> SaveRepositoriesToDatabaseAsync(
         IEnumerable<GitHubRepositoryDto> githubRepos,
         ApplicationUser user,
@@ -341,5 +439,96 @@ public class GitHubController : ControllerBase
             addedCount, updatedCount);
 
         return (addedCount, updatedCount);
+    }
+
+    /// <summary>
+    /// Saves commits to database with upsert logic
+    /// </summary>
+    private async Task<(int addedCount, int updatedCount)> SaveCommitsToDatabaseAsync(
+        IEnumerable<GitHubCommitDto> githubCommits,
+        Repository repository,
+        CancellationToken cancellationToken)
+    {
+        var commitRepo = _unitOfWork.Repository<Commit>();
+        var developerRepo = _unitOfWork.Repository<Developer>();
+        int addedCount = 0;
+        int updatedCount = 0;
+
+        foreach (var githubCommit in githubCommits)
+        {
+            // Check if commit already exists by SHA
+            var existingCommits = await commitRepo.FindAsync(
+                c => c.Sha == githubCommit.Sha && c.RepositoryId == repository.Id,
+                cancellationToken);
+            var existingCommit = existingCommits.FirstOrDefault();
+
+            // Find or create developer by email
+            var developers = await developerRepo.FindAsync(
+                d => d.Email == githubCommit.AuthorEmail,
+                cancellationToken);
+            var developer = developers.FirstOrDefault();
+
+            if (developer == null)
+            {
+                // Create new developer
+                developer = new Developer
+                {
+                    Id = Guid.NewGuid(),
+                    DisplayName = githubCommit.AuthorName,
+                    Email = githubCommit.AuthorEmail,
+                    GitHubUsername = githubCommit.AuthorEmail.Split('@')[0], // Temporary
+                    CreatedAt = DateTime.UtcNow
+                };
+                
+                await developerRepo.AddAsync(developer, cancellationToken);
+                _logger.LogDebug("Created new developer {Email}", developer.Email);
+            }
+            
+            if (existingCommit != null)
+            {
+                // Update existing commit
+                existingCommit.Message = githubCommit.Message;
+                existingCommit.LinesAdded = githubCommit.Additions;
+                existingCommit.LinesRemoved = githubCommit.Deletions;
+                existingCommit.FilesChanged = githubCommit.TotalChanges > 0 ? githubCommit.TotalChanges : 1;
+                existingCommit.CommittedAt = githubCommit.CommitterDate;
+                existingCommit.DeveloperId = developer.Id;
+                existingCommit.UpdatedAt = DateTime.UtcNow;
+
+                await commitRepo.UpdateAsync(existingCommit, cancellationToken);
+                updatedCount++;
+                _logger.LogDebug("Updated existing commit {Sha}", githubCommit.Sha);
+            }      
+            else
+            {
+                // Create new commit
+                var newCommit = new Commit
+                {
+                    Id = Guid.NewGuid(),
+                    RepositoryId = repository.Id,
+                    DeveloperId = developer.Id,
+                    Sha = githubCommit.Sha,
+                    Message = githubCommit.Message,
+                    LinesAdded = githubCommit.Additions,
+                    LinesRemoved = githubCommit.Deletions,
+                    FilesChanged = githubCommit.TotalChanges > 0 ? githubCommit.TotalChanges : 1,
+                    CommittedAt = githubCommit.CommitterDate,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await commitRepo.AddAsync(newCommit, cancellationToken);
+                addedCount++;
+                _logger.LogDebug("Added new commit {Sha}", githubCommit.Sha);
+            }            
+        }
+
+        // Save all changes to database
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Commit sync complete: {Added} added, {Updated} updated",
+                addedCount, updatedCount);
+
+            return (addedCount, updatedCount);
     }
 }
