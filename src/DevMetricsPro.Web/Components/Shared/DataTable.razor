@@ -1,0 +1,62 @@
+@typeparam TItem
+@* Professional data table component with generic type support *@
+
+<table class="data-table">
+    <thead>
+        <tr>
+            @TableHeader
+        </tr>
+    </thead>
+    <tbody>
+        @if (Items == null || !Items.Any())
+        {
+            <tr>
+                <td colspan="100" style="text-align: center; padding: var(--spacing-xl); color: var(--text-tertiary);">
+                    @EmptyMessage
+                </td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var item in Items)
+            {
+                <tr @onclick="() => OnRowClick.InvokeAsync(item)" style="@(OnRowClick.HasDelegate ? "cursor: pointer;" : "")">
+                    @RowTemplate?.Invoke(item)
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    /// <summary>
+    /// The items to display in the table
+    /// </summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+    
+    /// <summary>
+    /// Template for table header (th elements)
+    /// </summary>
+    [Parameter]
+    public RenderFragment? TableHeader { get; set; }
+    
+    /// <summary>
+    /// Template for each row (td elements)
+    /// </summary>
+    [Parameter]
+    public RenderFragment<TItem>? RowTemplate { get; set; }
+    
+    /// <summary>
+    /// Message to display when table is empty
+    /// </summary>
+    [Parameter]
+    public string EmptyMessage { get; set; } = "No data available";
+    
+    /// <summary>
+    /// Optional callback when a row is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<TItem> OnRowClick { get; set; }
+}
+
