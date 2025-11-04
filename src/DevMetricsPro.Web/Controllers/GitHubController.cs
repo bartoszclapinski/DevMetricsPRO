@@ -262,17 +262,17 @@ public class GitHubController : ControllerBase
     /// <summary>
     /// Sync commits for a specific repository
     /// </summary>
-    [HttpPost("commits/sync/{repositoryId}")]
+    [HttpPost("commits/sync/{githubRepositoryId}")]
     [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> SyncCommits(Guid repositoryId, CancellationToken cancellationToken)
+    public async Task<IActionResult> SyncCommits(long githubRepositoryId, CancellationToken cancellationToken)
     {
         try
         {
-            _logger.LogInformation("Starting commit sync for repository {RepositoryId}", repositoryId);
+            _logger.LogInformation("Starting commit sync for GitHub repository {GitHubRepositoryId}", githubRepositoryId);
 
             // Get currently logged-in user
             var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -294,15 +294,18 @@ public class GitHubController : ControllerBase
                 return BadRequest(new {error = "GitHub account not connected. Please connect your GitHub account first."});
             }
 
-            // Get repository from database
+            // Get repository from database by GitHub ID (stored as ExternalId)
             var repositoryRepo = _unitOfWork.Repository<Repository>();
-            var repositories = await repositoryRepo.FindAsync(r => r.Id == repositoryId, cancellationToken);
+            var githubIdString = githubRepositoryId.ToString();
+            var repositories = await repositoryRepo.FindAsync(r => r.ExternalId == githubIdString, cancellationToken);
             var repository = repositories.FirstOrDefault();
 
             if (repository == null)
             {
-                return NotFound(new {error = "Repository not found"});
+                return NotFound(new {error = $"Repository with GitHub ID {githubRepositoryId} not found in database. Please sync repositories first."});
             }
+            
+            var repositoryId = repository.Id; // Internal Guid for logging
 
             // Extract repository owner and repository name
             var owner = user.GitHubUsername;
@@ -348,7 +351,7 @@ public class GitHubController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error syncing commits for repository {RepositoryId}", repositoryId);
+            _logger.LogError(ex, "Error syncing commits for repository {GitHubRepositoryId}", githubRepositoryId);
             return StatusCode(500, new { error = "Failed to sync commits", detail = ex.Message });
         }   
         
@@ -450,7 +453,7 @@ public class GitHubController : ControllerBase
                 existingRepo.OpenIssuesCount = githubRepo.OpenIssuesCount;
                 existingRepo.Language = githubRepo.Language;
                 existingRepo.PushedAt = githubRepo.PushedAt;
-                existingRepo.LastSyncedAt = DateTime.UtcNow;
+                // Don't set LastSyncedAt here - only set it when commits are synced
                 existingRepo.UpdatedAt = DateTime.UtcNow;
 
                 await repositoryRepo.UpdateAsync(existingRepo, cancellationToken);
@@ -478,7 +481,8 @@ public class GitHubController : ControllerBase
                     Language = githubRepo.Language,
                     PushedAt = githubRepo.PushedAt,
                     IsActive = true,
-                    LastSyncedAt = DateTime.UtcNow,
+                    // Don't set LastSyncedAt here - only set it when commits are synced
+                    LastSyncedAt = null,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -511,6 +515,9 @@ public class GitHubController : ControllerBase
         int addedCount = 0;
         int updatedCount = 0;
 
+        // Track developers we've already processed in this batch to avoid duplicates
+        var processedDevelopers = new Dictionary<string, Developer>();
+
         foreach (var githubCommit in githubCommits)
         {
             // Check if commit already exists by SHA
@@ -520,25 +527,39 @@ public class GitHubController : ControllerBase
             var existingCommit = existingCommits.FirstOrDefault();
 
             // Find or create developer by email
-            var developers = await developerRepo.FindAsync(
-                d => d.Email == githubCommit.AuthorEmail,
-                cancellationToken);
-            var developer = developers.FirstOrDefault();
-
-            if (developer == null)
+            Developer? developer;
+            
+            // First check if we've already processed this developer in this batch
+            if (processedDevelopers.ContainsKey(githubCommit.AuthorEmail))
             {
-                // Create new developer
-                developer = new Developer
+                developer = processedDevelopers[githubCommit.AuthorEmail];
+            }
+            else
+            {
+                // Check database for existing developer
+                var developers = await developerRepo.FindAsync(
+                    d => d.Email == githubCommit.AuthorEmail,
+                    cancellationToken);
+                developer = developers.FirstOrDefault();
+
+                if (developer == null)
                 {
-                    Id = Guid.NewGuid(),
-                    DisplayName = githubCommit.AuthorName,
-                    Email = githubCommit.AuthorEmail,
-                    GitHubUsername = githubCommit.AuthorEmail.Split('@')[0], // Temporary
-                    CreatedAt = DateTime.UtcNow
-                };
+                    // Create new developer
+                    developer = new Developer
+                    {
+                        Id = Guid.NewGuid(),
+                        DisplayName = githubCommit.AuthorName,
+                        Email = githubCommit.AuthorEmail,
+                        GitHubUsername = githubCommit.AuthorEmail.Split('@')[0], // Temporary
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    
+                    await developerRepo.AddAsync(developer, cancellationToken);
+                    _logger.LogDebug("Created new developer {Email}", developer.Email);
+                }
                 
-                await developerRepo.AddAsync(developer, cancellationToken);
-                _logger.LogDebug("Created new developer {Email}", developer.Email);
+                // Add to processed cache
+                processedDevelopers[githubCommit.AuthorEmail] = developer;
             }
             
             if (existingCommit != null)
