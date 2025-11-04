@@ -296,6 +296,8 @@ else
     {
         public bool Success { get; set; }
         public int TotalCommits { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("recentCommits")]
         public List<RecentCommitDto>? Commits { get; set; }
     }
 
