@@ -45,6 +45,7 @@ public class GitHubRepositoryService : IGitHubRepositoryService
                 Name = repo.Name,
                 Description = repo.Description,
                 HtmlUrl = repo.HtmlUrl,
+                FullName = repo.FullName,
                 IsPrivate = repo.Private,
                 IsFork = repo.Fork,
                 StargazersCount = repo.StargazersCount,

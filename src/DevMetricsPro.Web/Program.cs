@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DevMetricsPro.Web.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -83,6 +85,9 @@ try
     builder.Services.AddScoped<IGitHubRepositoryService, GitHubRepositoryService>();
     builder.Services.AddScoped<IGitHubCommitsService, GitHubCommitsService>();
 
+    // Background Jobs
+    builder.Services.AddScoped<DevMetricsPro.Web.Jobs.SyncGitHubDataJob>();
+
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
     {
@@ -124,6 +129,21 @@ try
             };
         });
 
+    // Hangfire Configuration
+    builder.Services.AddHangfire(configuration => configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(options => 
+            options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+    // Add Hangfire server
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = 5; // Number of concurrent background workers
+        options.ServerName = "DevMetricsPro-Server";
+    });
+
     var app = builder.Build();
 
     // Use exception handler middleware
@@ -149,6 +169,16 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
+    // Hangfire Dashboard (only accessible to authenticated users)
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireAuthorizationFilter() },
+        DashboardTitle = "DevMetrics Pro - Background Jobs"
+    });
+
+    // Schedule recurring jobs
+    ConfigureRecurringJobs();
+
     app.UseSession();
 
     app.UseAntiforgery();
@@ -160,6 +190,21 @@ try
     app.MapControllers();
 
     app.Run();
+
+    // Local function to configure recurring jobs
+    void ConfigureRecurringJobs()
+    {
+        // Note: For MVP, we're not scheduling automatic syncs yet
+        // Users will manually trigger syncs from the UI or Hangfire dashboard
+        // In production, you would schedule recurring jobs here like:
+        
+        // RecurringJob.AddOrUpdate<SyncGitHubDataJob>(
+        //     "sync-github-data-hourly",
+        //     job => job.ExecuteAsync(userId), // Would need to iterate all users
+        //     Cron.Hourly);
+        
+        Log.Information("Hangfire recurring jobs configured");
+    }
 }
 catch (Exception ex)
 {

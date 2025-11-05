@@ -26,6 +26,11 @@ public class GitHubRepositoryDto
     public string HtmlUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Full repository name in owner/repo format (e.g., "octocat/Hello-World")
+    /// </summary>
+    public string? FullName { get; set; }
+
+    /// <summary>
     /// Whether the repository is private
     /// </summary>
     public bool IsPrivate { get; set; }
