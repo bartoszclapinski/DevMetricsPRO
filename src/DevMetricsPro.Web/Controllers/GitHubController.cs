@@ -609,4 +609,61 @@ public class GitHubController : ControllerBase
 
             return (addedCount, updatedCount);
     }
+
+    /// <summary>
+    /// Triggers a background job to sync all GitHub data (repositories and commits) for the current user
+    /// </summary>
+    /// <returns>Job ID</returns>
+    [HttpPost("sync-all")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> TriggerFullSync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Get authenticated user
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("User ID not found in JWT claims");
+                return Unauthorized(new { message = "User not authenticated" });
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User {UserId} not found", userId);
+                return BadRequest(new { message = "User not found" });
+            }
+
+            if (string.IsNullOrEmpty(user.GitHubAccessToken))
+            {
+                _logger.LogWarning("User {UserId} does not have GitHub connected", userId);
+                return BadRequest(new { message = "GitHub account not connected" });
+            }
+
+            // Enqueue background job
+            var jobId = Hangfire.BackgroundJob.Enqueue<Web.Jobs.SyncGitHubDataJob>(
+                job => job.ExecuteAsync(user.Id));
+
+            _logger.LogInformation(
+                "Enqueued full GitHub sync job {JobId} for user {UserId}",
+                jobId, userId);
+
+            return Ok(new
+            {
+                success = true,
+                message = "GitHub sync job started",
+                jobId = jobId
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error triggering full GitHub sync");
+            return StatusCode(500, new { message = "Failed to start sync job" });
+        }
+    }
 }
