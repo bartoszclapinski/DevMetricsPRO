@@ -744,21 +744,109 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ## WEEK 2: Background Jobs & Metrics
 
-### Day 7 - __________
+### Day 7 - November 6, 2025
 **Phases completed**:
-- [ ] Phase 2.5: Hangfire Setup
+- [x] Phase 2.5: Hangfire Background Jobs Setup ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 2.5 - Hangfire Background Jobs Setup:**
+- Installed Hangfire packages for .NET (Core, AspNetCore, PostgreSQL)
+- Configured Hangfire to use **PostgreSQL as job storage** (same DB as app data)
+  - All job state, history, and metadata persists in database
+  - Jobs survive application restarts
+  - Configured 5 concurrent workers for parallel job processing
+- Created Hangfire dashboard at `/hangfire` endpoint
+  - Web UI for monitoring jobs, viewing history, triggering manual runs
+  - Added authorization filter with DEBUG/RELEASE compilation directives
+  - In development: open access for testing
+  - In production: requires authentication
+- Implemented `SyncGitHubDataJob` background job class:
+  - Takes `userId` parameter
+  - Syncs repositories first (reuses `IGitHubRepositoryService`)
+  - Then syncs commits for each repository (reuses `IGitHubCommitsService`)
+  - Implements **incremental sync** using `LastSyncedAt` timestamps
+  - Auto-creates Developer entities for new commit authors
+  - Comprehensive logging at each step
+  - Proper error handling with retry support
+- Created `POST /api/github/sync-all` endpoint to trigger sync jobs
+  - Returns job ID for tracking
+  - Uses `BackgroundJob.Enqueue<T>` for fire-and-forget execution
+- Fixed `GitHubRepositoryDto` to include `FullName` property (owner/repo format)
+- Updated `GitHubRepositoryService` to map `FullName` from Octokit
+- Fixed property name mismatches in job class:
+  - `CommitterDate` (DTO) vs `CommittedAt` (entity)
+  - Removed non-existent `AuthorName`/`AuthorEmail` from Commit entity
+  - Author info tracked via Developer relationship, not on Commit directly
+
+**Key Concepts:**
+- **Hangfire**: Background job processing framework for .NET
+  - **Fire-and-forget jobs**: Execute once in background (what we implemented)
+  - **Delayed jobs**: Execute after specific time delay
+  - **Recurring jobs**: Execute on schedule (cron expressions)
+  - **Continuations**: Execute after another job completes
+- **Job Persistence**: PostgreSQL storage means jobs survive app crashes/restarts
+- **Worker Model**: Configurable worker count controls concurrency
+- **Dashboard**: Built-in web UI for job monitoring and management
+- **Automatic Retries**: Failed jobs retry with exponential backoff
+- **Job State Machine**: Enqueued → Processing → Succeeded/Failed
+- **Compilation Directives**: `#if DEBUG` for environment-specific behavior
+
+**Why Hangfire?**
+- **Reliable**: Jobs persist to database, survive restarts
+- **Transparent**: Dashboard shows all job history and state
+- **Simple**: Minimal configuration, works out of box
+- **Scalable**: Can add more workers or servers as needed
+- **Battle-tested**: Used in production by many companies
+
+**Challenges:**
+- **Issue**: Initial build errors due to property name mismatches
+  - Problem: DTO properties didn't match entity properties
+  - Solution: Fixed property mappings (`CommitterDate`, removed `AuthorName`/`AuthorEmail`)
+- **Issue**: Dashboard not accessible initially
+  - Problem: Authorization filter required cookie authentication
+  - Solution: Added `#if DEBUG` directive to allow open access in development
+- **Issue**: Missing `FullName` property on `GitHubRepositoryDto`
+  - Problem: Job tried to access property that didn't exist
+  - Solution: Added property to DTO and updated service mapping
+
+**Testing:**
+- ✅ Hangfire dashboard accessible at `/hangfire`
+- ✅ Dashboard shows jobs, retries, servers, recurring jobs tabs
+- ✅ Manual job trigger via `POST /api/github/sync-all` endpoint
+- ✅ Job executed successfully (Status: Succeeded)
+- ✅ Job duration: 56.163 seconds
+- ✅ Job latency: 117ms (fast pickup)
+- ✅ JWT Bearer token retrieved from localStorage
+- ✅ Job ID returned in API response
+- ✅ Job visible in dashboard with full execution details
+- ✅ Build successful: 0 errors, 0 warnings
+- ✅ All repositories and commits synced to database
+
+**Technical Debt Identified**:
+- Authorization filter uses `#if DEBUG` - need proper auth strategy for production
+- No recurring job scheduling yet (infrastructure ready, not configured)
+- Job doesn't handle GitHub API rate limits gracefully yet
+- No job progress reporting (could add IProgressHub for real-time updates)
+- No job cancellation support yet
+
+**Time spent**: ~3 hours  
+**Week 2 total**: ~3 hours  
+**Blockers**: None  
 **Notes**: 
+- 🎉 **PHASE 2.5 COMPLETE!** Background jobs working perfectly!
+- First successful background job execution: Job #1
+- Job synced all GitHub data in under 1 minute
+- Hangfire PostgreSQL integration seamless
+- Dashboard provides excellent visibility into job execution
+- Ready for Phase 2.6 (Pull Requests Sync)
+- Infrastructure now in place for automated recurring syncs in future
+- Issue #[TBD] ready to be closed after PR merge
+- Created feature branch: `sprint2/phase2.5-hangfire-setup-#[TBD]`
 
 ---
 
-### Day 7 - __________
+### Day 8 - __________
 **Phases completed**:
 - [ ] Phase 2.6: Pull Requests Sync
 
