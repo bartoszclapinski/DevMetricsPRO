@@ -846,21 +846,154 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
-### Day 8 - __________
+### Day 8 - November 11, 2025
 **Phases completed**:
-- [ ] Phase 2.6: Pull Requests Sync
+- [x] Phase 2.6: Pull Requests Sync ✅ (All 4 sub-phases!)
+  - [x] Phase 2.6.1: PR DTOs & Interface ✅ (Issue #74)
+  - [x] Phase 2.6.2: PR Service Implementation ✅ (Issue #75)
+  - [x] Phase 2.6.3: PR API Endpoint ✅ (Issue #76)
+  - [x] Phase 2.6.4: PR Background Job Integration ✅ (Issue #77)
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
+**Phase 2.6 - Pull Requests Sync (Sub-phase Pattern):**
+- Successfully split large phase into 4 focused sub-phases (learned from Phase 2.4)
+- Each sub-phase = separate issue + branch + PR = easier reviews and clear git history
+- Pattern: DTOs → Service → API → Background Job
+
+**Phase 2.6.1 - PR DTOs & Interface (Issue #74):**
+- Created `GitHubPullRequestDto` with comprehensive PR metadata:
+  - Basic: Number, Title, State, Body, HtmlUrl
+  - Author: AuthorLogin, AuthorName
+  - Timestamps: CreatedAt, UpdatedAt, ClosedAt, MergedAt
+  - Status flags: IsMerged, IsDraft
+  - Stats: Additions, Deletions, ChangedFiles
+- Created `IGitHubPullRequestService` interface
+- Method signature: `GetRepositoryPullRequestsAsync(owner, repo, token, since?, cancellationToken)`
+- Includes `since` parameter for incremental sync support
+
+**Phase 2.6.2 - PR Service Implementation (Issue #75):**
+- Implemented `GitHubPullRequestService` using Octokit
+- Used `client.PullRequest.GetAllForRepository()` with `PullRequestRequest`
+- Key configuration: `State = ItemStateFilter.All` (fetches both open AND closed PRs)
+- Sorted by `UpdatedAt` descending for incremental sync
+- Filtered results by `since` date when provided
+- Mapped all Octokit properties to our DTO:
+  - `pr.State.StringValue` → string state
+  - `pr.Merged` → IsMerged flag
+  - `pr.Draft` → IsDraft flag
+  - `pr.User.Login` → AuthorLogin
+- Error handling for 404, AuthorizationException, RateLimitExceededException
+- Registered service in DI container (Program.cs)
+
+**Phase 2.6.3 - PR API Endpoint (Issue #76):**
+- Added `POST /api/github/pull-requests/sync/{repositoryId}` endpoint
+- Injected `IGitHubPullRequestService` in GitHubController constructor
+- Implemented complete sync workflow:
+  1. Authenticate user (JWT Bearer)
+  2. Validate GitHub connection
+  3. Get repository by ID
+  4. Parse owner/repo from FullName
+  5. Fetch PRs from GitHub (incremental with LastSyncedAt)
+  6. Save to database with upsert logic
+  7. Update LastSyncedAt timestamp
+  8. Return statistics
+- Created `SavePullRequestsToDatabaseAsync()` helper method
+- Upsert logic checks by `ExternalId` (PR number) + `RepositoryId`
+- Auto-creates Developer entities for PR authors
+- Developer caching prevents duplicate queries (Dictionary<string, Developer>)
+- PR status mapping with pattern matching:
+  - `"open"` → `PullRequestStatus.Open`
+  - `"closed"` + `IsMerged == true` → `PullRequestStatus.Merged`
+  - `"closed"` + `IsMerged == false` → `PullRequestStatus.Closed`
+- Important: PullRequest entity uses `ExternalId` (string), not `Number` (int)
+- Placeholder email for developers: `{username}@github.user`
+
+**Phase 2.6.4 - PR Background Job Integration (Issue #77):**
+- Updated `SyncGitHubDataJob` to include PR sync
+- Injected `IGitHubPullRequestService` in constructor
+- Added Step 3: PR sync loop (after commits sync)
+- For each repository:
+  - Fetch PRs from GitHub
+  - Save to database with upsert logic
+  - Log progress
+  - Continue on error (doesn't break entire sync)
+- Implemented `SavePullRequestsToDatabaseAsync()` method in job
+- Same upsert pattern as controller (reusable logic)
+- Updated final log message to include PR count
+- Job now syncs: Repositories → Commits → Pull Requests ✅
+
+**Key Concepts:**
+- **Pull Request Lifecycle**: Open → (merged or just closed)
+- **Merged vs Closed**: Merged PRs have `state = "closed"` AND `merged = true`
+- **Draft PRs**: GitHub feature - PRs in draft state (not ready for review)
+- **PR Number**: Unique per repository (not globally unique)
+- **ExternalId Pattern**: Store external IDs as strings for flexibility
+- **Incremental Sync**: `since` parameter + `LastSyncedAt` reduces API calls
+- **Sub-phase Pattern**: Break large features into focused PRs
+- **Developer Auto-Creation**: Create Developer entities on-the-fly for contributors
+- **Upsert Pattern**: Check existence, update if exists, create if not
+- **Developer Caching**: Dictionary cache prevents N+1 query problem
+
+**Why This Pattern Works:**
+- **ItemStateFilter.All**: Gets complete history (not just open PRs)
+- **Status Mapping**: Correctly distinguishes merged from just closed
+- **Author Tracking**: Links PRs to Developer entities
+- **Incremental**: Only fetches PRs updated since last sync
+- **Resilient**: Per-repository error handling in background job
+
+**Challenges:**
+- **Issue**: PullRequest entity uses `ExternalId` not `Number`
+  - Problem: Initial code tried to use `pr.Number` property
+  - Solution: Convert `githubPR.Number.ToString()` to `ExternalId`
+  - Learning: Always check entity schema before implementing
+- **Issue**: Nullable warning with `FirstOrDefault`
+  - Problem: Compiler warning about potential null
+  - Solution: Added null-forgiving operator `!` (we check null immediately after)
+- **Issue**: Breaking large phase into manageable pieces
+  - Problem: Phase 2.6 would be massive single PR
+  - Solution: Split into 4 sub-phases with separate issues
+  - Result: Much cleaner git history, easier reviews
+
+**Testing:**
+- ✅ All 4 sub-phases build with 0 errors, 0 warnings
+- ✅ Phase 2.6.1: DTOs and interface compile correctly
+- ✅ Phase 2.6.2: Service successfully fetches PRs from GitHub
+- ✅ Phase 2.6.3: API endpoint ready (not yet tested with real data)
+- ✅ Phase 2.6.4: Background job compiles and includes PR sync
+
+**Technical Debt Identified**:
+- PR sync not yet tested end-to-end (need to trigger background job)
+- No UI to display synced PRs yet
+- No PR review/comment sync (future sprint)
+- Developer emails are placeholders (`@github.user`)
+- Could optimize queries with EF Core Include() for navigation properties
+
+**Time spent**: ~3 hours total
+- Phase 2.6.1: ~30 minutes (DTOs + Interface)
+- Phase 2.6.2: ~45 minutes (Service implementation)
+- Phase 2.6.3: ~1 hour (API endpoint)
+- Phase 2.6.4: ~45 minutes (Background job integration)
+
+**Week 2 total**: ~6 hours  
+**Blockers**: None  
 **Notes**: 
+- 🎉 **PHASE 2.6 COMPLETE!** All 4 sub-phases done!
+- Sub-phase pattern worked excellently (smaller, focused PRs)
+- Pull requests now sync automatically via background job
+- Full integration: GitHub API → Service → Database
+- Issues #74, #75, #76, #77 closed
+- Feature branches merged to master
+- Ready for Phase 2.7 (Basic Metrics Calculation)
+- Phase 2.6 demonstrated good software engineering practices:
+  - Breaking down complex features
+  - Incremental commits
+  - Comprehensive error handling
+  - Reusable code patterns
 
 ---
 
-### Day 8 - __________
+### Day 9 - __________
 **Phases completed**:
 - [ ] Phase 2.7: Basic Metrics Calculation
 

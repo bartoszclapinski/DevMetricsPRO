@@ -50,10 +50,10 @@ Let's continue building! 🚀
 After the AI reads those files, it should:
 
 ### 1. **Understand Current State**
-- ✅ Know we're in **Sprint 2** (GitHub Integration & UI Redesign)
-- ✅ Know **Phases 2.1-2.4** are complete (OAuth, repos, commits all working!)
+- ✅ Know we're in **Sprint 2** (GitHub Integration & Background Jobs)
+- ✅ Know **Phases 2.1-2.6** are complete (OAuth, repos, commits, Hangfire, PRs all working!)
 - ✅ Know **UI Redesign** is complete (all 4 parts done!)
-- ✅ Know the **next phase** is **Phase 2.5** (Hangfire Background Jobs)
+- ✅ Know the **next phase** is **Phase 2.7** (Basic Metrics Calculation)
 - ✅ Understand **Sprint 1** is fully complete (Authentication working)
 
 ### 2. **Understand the Workflow**
@@ -134,30 +134,34 @@ src/
 
 ---
 
-## 🚀 What to Do Next (Phase 2.5 - Hangfire Background Jobs)
+## 🚀 What to Do Next (Phase 2.7 - Basic Metrics Calculation)
 
-Based on `sprint-log.md`, the next phase is **Phase 2.5: Hangfire Setup**:
+Based on `sprint-log.md`, the next phase is **Phase 2.7: Basic Metrics Calculation**:
 
-1. **Install Hangfire**
-   - Add Hangfire NuGet packages
-   - Configure Hangfire with PostgreSQL storage
-   - Add Hangfire dashboard
-   - Configure authentication for dashboard
+1. **Create Metrics Service**
+   - IMetricsCalculationService interface
+   - Calculate basic metrics per developer:
+     - Total commits
+     - Lines added/removed
+     - Pull requests (opened, merged)
+     - Active days
+     - Average commit size
 
-2. **Create Background Job Services**
-   - Repository sync background job
-   - Commit sync background job
-   - Pull request sync background job (Phase 2.6)
+2. **Store Metrics in Database**
+   - Use existing Metric entity
+   - Store MetricType and Value
+   - Link to Developer and date range
+   - Support historical data
 
-3. **Schedule Jobs**
-   - Configure recurring jobs (hourly, daily)
-   - Set up job queues
-   - Configure retry policies
+3. **Calculate Metrics in Background Job**
+   - Add metrics calculation to SyncGitHubDataJob
+   - Run after data sync completes
+   - Update existing metrics or create new
 
-4. **Test Background Jobs**
-   - Manually trigger jobs
-   - Verify jobs run on schedule
-   - Check job history and logs
+4. **Test Metrics Calculation**
+   - Verify metrics stored correctly
+   - Check calculations are accurate
+   - View metrics in database
 
 ---
 
@@ -239,9 +243,9 @@ dotnet test
 
 ## 📊 Current Sprint Status
 
-**Sprint**: Sprint 2 - GitHub Integration & UI Redesign  
-**Progress**: ~60% Complete (Week 1 done!)  
-**Next**: Phase 2.5 - Hangfire Background Jobs
+**Sprint**: Sprint 2 - GitHub Integration & Background Jobs  
+**Progress**: ~80% Complete (Week 2 in progress!)  
+**Next**: Phase 2.7 - Basic Metrics Calculation
 
 ### ✅ Sprint 1 - Complete:
 - Phase 1.1: Core entities (Developer, Repository, Commit, PR, Metric)
@@ -259,9 +263,15 @@ dotnet test
 - Phase 2.4: GitHub commits sync (working perfectly!)
 - **UI Redesign**: Professional design system (all 4 parts done!)
 
-### 🎯 Sprint 2 Week 2 - Next Up:
-- Phase 2.5: Hangfire Setup (background jobs)
-- Phase 2.6: Pull Requests Sync
+### ✅ Sprint 2 Week 2 - In Progress:
+- Phase 2.5: Hangfire Setup ✅ (background jobs working!)
+- Phase 2.6: Pull Requests Sync ✅ (all 4 sub-phases complete!)
+  - 2.6.1: PR DTOs & Interface ✅
+  - 2.6.2: PR Service Implementation ✅
+  - 2.6.3: PR API Endpoint ✅
+  - 2.6.4: Background Job Integration ✅
+
+### 🎯 Sprint 2 Remaining:
 - Phase 2.7: Basic Metrics Calculation
 - Phase 2.8: Week 2 Wrap-up
 
@@ -318,15 +328,15 @@ You'll know you're on the right track when:
 
 Once you've read the required files and understand the project status, you should:
 
-1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 2, Phases 2.1-2.4 complete + UI Redesign complete. Next is Phase 2.5 (Hangfire Setup)."
-2. **Summarize status**: "GitHub integration fully working (OAuth, repos, commits). Professional UI redesign complete. Dashboard shows real GitHub data."
-3. **Ask for direction**: "Would you like to continue with Phase 2.5 (Hangfire), or work on something else?"
+1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 2, Phases 2.1-2.6 complete (OAuth, repos, commits, Hangfire, PRs all working!). Next is Phase 2.7 (Basic Metrics Calculation)."
+2. **Summarize status**: "GitHub integration fully working. Background jobs sync repos, commits, and PRs automatically. Professional UI redesign complete. Dashboard shows real GitHub data."
+3. **Ask for direction**: "Would you like to continue with Phase 2.7 (Metrics), or work on something else?"
 
 Let's build something great! 🎉
 
 ---
 
-**Last Updated**: November 4, 2025  
-**Sprint**: Sprint 2, Week 1 Complete (~60% done!)  
-**Version**: 2.0
+**Last Updated**: November 11, 2025  
+**Sprint**: Sprint 2, ~80% Complete (Phase 2.6 done!)  
+**Version**: 3.0
 

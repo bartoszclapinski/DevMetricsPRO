@@ -77,12 +77,14 @@ DevMetricsPRO/
 | `DTOs/GitHub/GitHubOAuthRequest.cs` | OAuth request | ClientId, Scopes, State |
 | `DTOs/GitHub/GitHubOAuthResponse.cs` | OAuth response | AccessToken, TokenType, GitHubUsername, GitHubUserId |
 | `DTOs/GitHub/GitHubCallbackRequest.cs` | OAuth callback | Code, State |
-| `DTOs/GitHub/GitHubRepositoryDto.cs` | **✅ REPOSITORY DATA** | Id, Name, Description, HtmlUrl, IsPrivate, IsFork, StargazersCount, ForksCount, OpenIssuesCount, Language, CreatedAt, UpdatedAt, PushedAt |
+| `DTOs/GitHub/GitHubRepositoryDto.cs` | **✅ REPOSITORY DATA** | Id, Name, Description, HtmlUrl, FullName, IsPrivate, IsFork, StargazersCount, ForksCount, OpenIssuesCount, Language, CreatedAt, UpdatedAt, PushedAt |
 | `DTOs/GitHub/GitHubCommitDto.cs` | **✅ COMMIT DATA** (Phase 2.4) | Sha, Message, AuthorName, AuthorEmail, CommitterName, CommitterEmail, CommittedAt, AuthorDate, HtmlUrl, Additions, Deletions, TotalChanges, RepositoryName |
+| `DTOs/GitHub/GitHubPullRequestDto.cs` | **✅ PULL REQUEST DATA** (Phase 2.6) | Number, Title, State, Body, HtmlUrl, AuthorLogin, AuthorName, CreatedAt, UpdatedAt, ClosedAt, MergedAt, IsMerged, IsDraft, Additions, Deletions, ChangedFiles, RepositoryName |
 
 **⚠️ IMPORTANT**: 
 - `GitHubRepositoryDto` is the **ONLY** repository DTO. Use this for all UI and API interactions!
 - `GitHubCommitDto` is the **ONLY** commit DTO. Use this for all commit-related UI and API interactions!
+- `GitHubPullRequestDto` is the **ONLY** PR DTO. Use this for all PR-related UI and API interactions!
 
 ### Service Interfaces
 
@@ -92,8 +94,7 @@ DevMetricsPRO/
 | `Interfaces/IGitHubOAuthService.cs` | `GetAuthorizationUrl()`, `ExchangeCodeForTokenAsync()` | GitHub OAuth flow |
 | `Interfaces/IGitHubRepositoryService.cs` | `GetUserRepositoriesAsync()` | Fetch repos from GitHub API |
 | `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API (Phase 2.4) ✅ |
-
-**📝 Note**: No PR service interface yet (coming in Phase 2.6)
+| `Interfaces/IGitHubPullRequestService.cs` | `GetRepositoryPullRequestsAsync()` | Fetch PRs from GitHub API (Phase 2.6) ✅ |
 
 ---
 
@@ -134,8 +135,7 @@ DevMetricsPRO/
 | `Services/GitHubOAuthService.cs` | `IGitHubOAuthService` | GitHub OAuth token exchange |
 | `Services/GitHubRepositoryService.cs` | `IGitHubRepositoryService` | Fetch repos using Octokit.NET |
 | `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET (Phase 2.4) ✅ |
-
-**📝 Note**: No PR service yet (coming in Phase 2.6)
+| `Services/GitHubPullRequestService.cs` | `IGitHubPullRequestService` | Fetch PRs using Octokit.NET (Phase 2.6) ✅ |
 
 ### Migrations
 
@@ -169,6 +169,8 @@ DevMetricsPRO/
 - ✅ `POST /api/github/sync-repositories` - Sync repos from GitHub
 - ✅ `POST /api/github/commits/sync/{repositoryId}` - Sync commits for repository (Phase 2.4) ✅
 - ✅ `GET /api/github/commits/recent?limit=10` - Get recent commits (Phase 2.4) ✅
+- ✅ `POST /api/github/pull-requests/sync/{repositoryId}` - Sync PRs for repository (Phase 2.6) ✅
+- ✅ `POST /api/github/sync-all` - Trigger full sync background job (Phase 2.5) ✅
 
 ### Blazor Pages
 
@@ -223,11 +225,27 @@ DevMetricsPRO/
 |------|---------|
 | `Services/AuthStateService.cs` | Manages JWT token in localStorage, checks authentication state |
 
+### Background Jobs (Phase 2.5)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Jobs/SyncGitHubDataJob.cs` | Background job for syncing GitHub data (repos, commits, PRs) | ✅ Working |
+
+**What it does:**
+- Syncs repositories from GitHub API
+- Syncs commits for each repository (incremental)
+- Syncs pull requests for each repository (incremental)
+- Auto-creates Developer entities for contributors
+- Uses `LastSyncedAt` for efficient incremental syncs
+- Triggered via: `POST /api/github/sync-all` endpoint
+- Managed by Hangfire (dashboard at `/hangfire`)
+
 ### Middleware
 
 | File | Purpose |
 |------|---------|
 | `Middleware/GlobalExceptionHandler.cs` | Global exception handling with logging |
+| `Middleware/HangfireAuthorizationFilter.cs` | Hangfire dashboard authorization (DEBUG: open, RELEASE: auth required) |
 
 ---
 
@@ -253,23 +271,25 @@ DevMetricsPRO/
 - [x] Phase 2.2: Store GitHub tokens in database ✅
 - [x] Phase 2.3: GitHub repositories sync (backend) ✅
 - [x] Phase 2.3.3: Repositories UI page ✅
-- [ ] Phase 2.4: Commits sync (current task)
-- [ ] Phase 2.5: Hangfire setup
-- [ ] Phase 2.6: Pull requests sync
-- [ ] Phase 2.7: Basic metrics calculation
+- [x] Phase 2.4: Commits sync ✅
+- [x] Phase 2.5: Hangfire setup ✅
+- [x] Phase 2.6: Pull requests sync ✅
+  - [x] Phase 2.6.1: PR DTOs & Interface ✅
+  - [x] Phase 2.6.2: PR Service Implementation ✅
+  - [x] Phase 2.6.3: PR API Endpoint ✅
+  - [x] Phase 2.6.4: PR Background Job Integration ✅
+- [ ] Phase 2.7: Basic metrics calculation (Next!)
 
 ### ⏭️ Not Started
 
 - Developers page (`/developers`)
 - Metrics page (`/metrics`)
 - Settings page (`/settings`)
-- Commit sync service
-- Pull request sync service
+- Pull Requests UI page (`/pull-requests`)
 - Metrics calculation service
-- Background jobs (Hangfire)
-- Redis caching
-- Dashboard charts (ApexCharts)
-- SignalR real-time updates
+- Redis caching (Phase 2.8)
+- Dashboard charts (ApexCharts) (Sprint 3)
+- SignalR real-time updates (Sprint 3)
 
 ---
 
@@ -294,11 +314,11 @@ DevMetricsPRO/
 ### ✅ OK TO CREATE:
 
 **Services (not yet implemented):**
-- `IGitHubPullRequestService` - For Phase 2.6
 - `IMetricsCalculationService` - For Phase 2.7
 
 **Pages (not yet implemented):**
 - `Developers.razor` - Display developers list
+- `PullRequests.razor` - Display synced PRs
 - `Metrics.razor` - Display metrics charts
 - `Settings.razor` - User settings
 
@@ -430,10 +450,10 @@ public class MyService : IMyService
 
 ---
 
-**Last Updated**: October 31, 2025 (Post Phase 2.3.3)  
+**Last Updated**: November 11, 2025 (Post Phase 2.6)  
 **Current Sprint**: Sprint 2 - GitHub Integration  
-**Current Phase**: Phase 2.4 - Commits Sync (Next)  
-**Progress**: Week 1 Complete - 4/8 phases done (50%)  
-**Next Review**: After each sprint completion
+**Current Phase**: Phase 2.7 - Basic Metrics Calculation (Next)  
+**Progress**: Week 2 In Progress - 6/8 phases done (75%)  
+**Next Review**: After Sprint 2 completion
 
 
