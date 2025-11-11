@@ -13,11 +13,11 @@
 
 ---
 
-## ⚡ Current Status (As of Nov 4, 2025)
+## ⚡ Current Status (As of Nov 11, 2025)
 
 - **Sprint**: Sprint 2 - GitHub Integration
-- **Progress**: Phase 2.4 complete ✅ + UI Redesign complete ✅
-- **Next Phase**: Phase 2.5 - Hangfire for background jobs
+- **Progress**: Phase 2.6 complete ✅ (All 4 sub-phases!) + Hangfire working ✅
+- **Next Phase**: Phase 2.7 - Basic Metrics Calculation
 - **Branch**: Currently on `master` (all features merged!)
 
 ### ✅ What's Working:
@@ -46,6 +46,19 @@
   - Dashboard shows total commit count
   - Incremental sync (only fetch new commits)
   - Developer entity creation with duplicate prevention
+- **Sprint 2 Phase 2.5**: Hangfire Background Jobs ✅
+  - Hangfire installed with PostgreSQL storage
+  - Dashboard at /hangfire for job monitoring
+  - SyncGitHubDataJob for automated syncing
+  - POST /api/github/sync-all endpoint
+  - Background job syncs repos + commits automatically
+- **Sprint 2 Phase 2.6**: Pull Requests Sync ✅ (4 sub-phases!)
+  - Phase 2.6.1: GitHubPullRequestDto + IGitHubPullRequestService
+  - Phase 2.6.2: GitHubPullRequestService implementation with Octokit
+  - Phase 2.6.3: POST /api/github/pull-requests/sync/{repositoryId} endpoint
+  - Phase 2.6.4: SyncGitHubDataJob updated to sync PRs
+  - Full PR sync: Open, Closed, Merged status
+  - Developer auto-creation for PR authors
 - **Sprint 2 UI Redesign**: Professional design system ✅
   - Custom design-system.css with CSS variables
   - Design tokens (colors, typography, spacing, shadows)
@@ -56,9 +69,9 @@
   - WCAG AAA compliant color palette
 
 ### ⏭️ What's Next:
-- Phase 2.5: Configure Hangfire for background jobs
-- Phase 2.6: Sync pull requests
-- Phase 2.7: Basic metrics calculation
+- Phase 2.7: Basic metrics calculation (commit count, lines added/removed, PR count, etc.)
+- Phase 2.8: Week 2 wrap-up and Sprint 2 completion
+- Sprint 3: Real-time dashboard with SignalR, charts, visualizations
 
 ---
 

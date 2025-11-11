@@ -7,13 +7,14 @@ using Microsoft.AspNetCore.Identity;
 namespace DevMetricsPro.Web.Jobs;
 
 /// <summary>
-/// Background job for syncing GitHub data (repositories and commits) for a user.
+/// Background job for syncing GitHub data (repositories, commits, and pull requests) for a user.
 /// This job is executed by Hangfire on a schedule or manually triggered.
 /// </summary>
 public class SyncGitHubDataJob
 {
     private readonly IGitHubRepositoryService _repositoryService;
     private readonly IGitHubCommitsService _commitsService;
+    private readonly IGitHubPullRequestService _pullRequestService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<SyncGitHubDataJob> _logger;
@@ -21,12 +22,14 @@ public class SyncGitHubDataJob
     public SyncGitHubDataJob(
         IGitHubRepositoryService repositoryService,
         IGitHubCommitsService commitsService,
+        IGitHubPullRequestService pullRequestService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         ILogger<SyncGitHubDataJob> logger)
     {
         _repositoryService = repositoryService;
         _commitsService = commitsService;
+        _pullRequestService = pullRequestService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _logger = logger;
@@ -34,7 +37,7 @@ public class SyncGitHubDataJob
 
     /// <summary>
     /// Executes the GitHub data sync for a specific user.
-    /// This method syncs repositories first, then commits for each repository.
+    /// This method syncs repositories first, then commits, then pull requests for each repository.
     /// </summary>
     /// <param name="userId">The ID of the user to sync data for</param>
     public async Task ExecuteAsync(Guid userId)
@@ -121,10 +124,59 @@ public class SyncGitHubDataJob
                 }
             }
 
+            // Step 3: Sync pull requests for each repository
+            var totalPRsSynced = 0;
+            foreach (var repo in syncedRepos)
+            {
+                try
+                {
+                    _logger.LogInformation("Syncing pull requests for repository {RepoName}", repo.Name);
+
+                    // Parse owner/repo from FullName
+                    var parts = repo.FullName?.Split('/');
+                    if (parts == null || parts.Length != 2)
+                    {
+                        _logger.LogWarning("Invalid repository FullName format: {FullName}", repo.FullName);
+                        continue;
+                    }
+
+                    var owner = parts[0];
+                    var repoName = parts[1];
+
+                    // Fetch PRs (incremental sync using LastSyncedAt)
+                    var pullRequests = await _pullRequestService.GetRepositoryPullRequestsAsync(
+                        owner,
+                        repoName,
+                        user.GitHubAccessToken,
+                        repo.LastSyncedAt,
+                        CancellationToken.None);
+
+                    var prList = pullRequests.ToList();
+                    _logger.LogInformation("Found {Count} pull requests for repository {RepoName}", 
+                        prList.Count, repoName);
+
+                    // Save PRs to database
+                    if (prList.Any())
+                    {
+                        var (added, updated) = await SavePullRequestsToDatabaseAsync(prList, repo.Id);
+                        totalPRsSynced += added + updated;
+
+                        _logger.LogInformation(
+                            "Synced {Count} pull requests for repository {RepoName} ({Added} added, {Updated} updated)",
+                            added + updated, repoName, added, updated);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error syncing pull requests for repository {RepoName}", repo.Name);
+                    // Continue with next repository
+                }
+            }
+
             _logger.LogInformation(
                 "GitHub data sync completed for user {UserId}. " +
-                "Synced {RepoCount} repositories and {CommitCount} commits",
-                userId, syncedRepos.Count, totalCommitsSynced);
+                "Synced {RepoCount} repositories, {CommitCount} commits, and {PRCount} pull requests",
+                userId, syncedRepos.Count, totalCommitsSynced, totalPRsSynced);
         }
         catch (Exception ex)
         {
@@ -266,6 +318,106 @@ public class SyncGitHubDataJob
                 };
 
                 await commitRepository.AddAsync(newCommit);
+                addedCount++;
+            }
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return (addedCount, updatedCount);
+    }
+
+    private async Task<(int addedCount, int updatedCount)> SavePullRequestsToDatabaseAsync(
+        List<Application.DTOs.GitHub.GitHubPullRequestDto> githubPRs,
+        Guid repositoryId)
+    {
+        var addedCount = 0;
+        var updatedCount = 0;
+        var prRepository = _unitOfWork.Repository<PullRequest>();
+        var developerRepository = _unitOfWork.Repository<Developer>();
+
+        // Cache processed developers to avoid duplicate queries
+        var processedDevelopers = new Dictionary<string, Developer>();
+
+        foreach (var githubPR in githubPRs)
+        {
+            // Check if PR already exists (by ExternalId + repository)
+            var existingPRs = await prRepository.GetAllAsync();
+            var existingPR = existingPRs.FirstOrDefault(pr =>
+                pr.ExternalId == githubPR.Number.ToString() &&
+                pr.RepositoryId == repositoryId);
+
+            // Find or create developer (author)
+            Developer developer;
+            if (processedDevelopers.ContainsKey(githubPR.AuthorLogin))
+            {
+                developer = processedDevelopers[githubPR.AuthorLogin];
+            }
+            else
+            {
+                var developers = await developerRepository.GetAllAsync();
+                developer = developers.FirstOrDefault(d =>
+                    d.GitHubUsername == githubPR.AuthorLogin)!;
+
+                if (developer == null)
+                {
+                    // Create new developer
+                    developer = new Developer
+                    {
+                        DisplayName = githubPR.AuthorName ?? githubPR.AuthorLogin,
+                        Email = $"{githubPR.AuthorLogin}@github.user", // Placeholder email
+                        GitHubUsername = githubPR.AuthorLogin,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    developer = await developerRepository.AddAsync(developer);
+                    await _unitOfWork.SaveChangesAsync(); // Save to get ID
+                    _logger.LogDebug("Created new developer {GitHubUsername}", developer.GitHubUsername);
+                }
+
+                processedDevelopers[githubPR.AuthorLogin] = developer;
+            }
+
+            // Map PR status
+            var prStatus = githubPR.State.ToLower() switch
+            {
+                "open" => PullRequestStatus.Open,
+                "closed" when githubPR.IsMerged => PullRequestStatus.Merged,
+                "closed" => PullRequestStatus.Closed,
+                _ => PullRequestStatus.Open
+            };
+
+            if (existingPR != null)
+            {
+                // Update existing PR
+                existingPR.Title = githubPR.Title;
+                existingPR.Description = githubPR.Body;
+                existingPR.Status = prStatus;
+                existingPR.AuthorId = developer.Id;
+                existingPR.ClosedAt = githubPR.ClosedAt;
+                existingPR.MergedAt = githubPR.MergedAt;
+                existingPR.UpdatedAt = DateTime.UtcNow;
+
+                await prRepository.UpdateAsync(existingPR);
+                updatedCount++;
+            }
+            else
+            {
+                // Create new PR
+                var newPR = new PullRequest
+                {
+                    RepositoryId = repositoryId,
+                    AuthorId = developer.Id,
+                    ExternalId = githubPR.Number.ToString(),
+                    Title = githubPR.Title,
+                    Description = githubPR.Body,
+                    Status = prStatus,
+                    ClosedAt = githubPR.ClosedAt,
+                    MergedAt = githubPR.MergedAt,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await prRepository.AddAsync(newPR);
                 addedCount++;
             }
         }
