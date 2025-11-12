@@ -993,45 +993,105 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
-### Day 9 - __________
+### Day 9 - November 12, 2025
 **Phases completed**:
-- [ ] Phase 2.7: Basic Metrics Calculation
+- [x] Phase 2.6.5: Pull Requests UI Page ✅
 
 **What I learned**:
-- 
-- 
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
-**Notes**: 
+**Phase 2.6.5 - Pull Requests UI Page:**
+- Completed Phase 2.6 by adding UI for pull requests (backend was done in 2.6.1-2.6.4)
+- Created `GET /api/github/pull-requests` endpoint in `GitHubController`:
+  - Fetches PRs from database (not GitHub API)
+  - Supports optional filters: `repositoryId` and `status` (all/open/closed/merged)
+  - Returns PRs with author, repository, dates, GitHub URLs
+  - Orders by `UpdatedAt` descending (most recent first)
+- Created `PullRequests.razor` page at `/pull-requests` route:
+  - Follows same pattern as `Repositories.razor` (5 UI states)
+  - Responsive grid layout (3 columns → 2 → 1)
+  - Repository filter dropdown (loads all user repos)
+  - Status filter dropdown (All/Open/Closed/Merged)
+  - "Sync All PRs" button triggers `POST /api/github/sync-all` background job
+  - PR cards display:
+    - PR number (#82) and title (clickable to GitHub)
+    - Status badge with semantic colors (Open=green, Closed=red, Merged=purple)
+    - Repository name and author info
+    - Relative timestamps ("2 days ago")
+  - Uses existing components: `DataPanel`, `StatusBadge`
+  - Follows design system patterns (professional, data-dense UI)
+- Implemented client-side filtering for better UX:
+  - Stores all PRs in `_allPullRequests`
+  - Applies filters locally with `ApplyFilters()` method
+  - Avoids unnecessary API calls when changing filters
+- Pattern consistency with Repositories page:
+  - Same authentication/GitHub connection checks
+  - Same loading/error/empty states
+  - Same relative time helper method
+  - Internal DTO classes for API responses
 
----
+**Key Concepts:**
+- **Client-side Filtering**: Store all data, filter in memory for instant response
+- **Semantic Status Colors**: Visual cues for PR states (green/red/purple)
+- **Navigation Integration**: TopNav already had `/pull-requests` tab ready
+- **Background Job Integration**: "Sync All" triggers full sync (repos + commits + PRs)
+- **Phase Completion**: 2.6.5 completes entire Phase 2.6 (all 5 sub-phases)
 
-### Day 9 - __________
-**Phases completed**:
-- [ ] Phase 2.8: Week 2 Wrap-up (start)
+**Challenges:**
+- None - straightforward implementation following established patterns
 
-**What I learned**:
-- 
-- 
+**Testing:**
+- ✅ Solution builds: 0 errors, 0 warnings
+- ✅ Page structure follows Repositories.razor pattern
+- ✅ API endpoint returns correct data structure
+- ✅ Filters work with switch expressions
+- ✅ GitHub URLs constructed correctly
+- ✅ Component reuse (DataPanel, StatusBadge)
 
-**Time spent**: ___ hours  
-**Blockers**: None / [describe]  
-**Notes**: 
+**Technical Debt Identified**:
+- PRs need to be synced first to appear (currently via background job or API)
+- Could add "Last synced" timestamp per repository
+- Could add PR description preview in cards
+- Could add PR review status/comments (future sprint)
+
+**Time spent**: ~2 hours
+**Week 2 total**: ~8 hours
+**Blockers**: None
+**Notes**:
+- Phase 2.6 is now 100% complete! All 5 sub-phases done ✅
+- Pull Requests feature fully integrated (backend + UI)
+- Consistent with existing design and patterns
+- Issue #82 closed via commit message
+- Feature branch: `sprint2/phase2.6.5-pr-ui-page-#82`
+- Ready for Phase 2.7 (Basic Metrics Calculation) - the last phase of Sprint 2!
 
 ---
 
 ### Day 10 - __________
 **Phases completed**:
-- [ ] Phase 2.8: Week 2 Wrap-up (complete)
+- [ ] Phase 2.7: Basic Metrics Calculation
 
 **What I learned**:
-- 
-- 
+-
+-
 
-**Time spent**: ___ hours  
-**Week 2 total**: ~__ hours  
-**Sprint 2 total**: ~__ hours  
+**Time spent**: ___ hours
+**Blockers**: None / [describe]
+**Notes**: 
+
+---
+
+### Day 11 - __________
+**Phases completed**:
+- [ ] Phase 2.8: Week 2 Wrap-up
+
+**What I learned**:
+-
+-
+
+**Time spent**: ___ hours
+**Week 2 total**: ~__ hours
+**Sprint 2 total**: ~__ hours
+**Blockers**: None / [describe]
 **Notes**: 
 
 ---

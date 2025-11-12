@@ -57,8 +57,9 @@ After the AI reads those files, it should:
 - ✅ Understand **Sprint 1** is fully complete (Authentication working)
 
 ### 2. **Understand the Workflow**
-- ✅ **AI implements code directly** using tools (not user)
-- ✅ **User reviews and approves** changes in their IDE
+- ✅ **AI provides guidance** on what to implement and how
+- ✅ **User implements code** in their IDE based on AI guidance
+- ✅ **AI reviews user's implementation** and provides feedback
 - ✅ **Issue-driven development**: Create GitHub issue → branch → implement → PR → merge
 - ✅ **Learning mode**: Explain concepts, teach as we go
 - ✅ **Documentation**: Keep sprint log updated with learnings
@@ -171,16 +172,16 @@ Based on `sprint-log.md`, the next phase is **Phase 2.7: Basic Metrics Calculati
 - ✅ **Read sprint log first** - Shows daily progress and learnings
 - ✅ **Create GitHub issue** before each phase
 - ✅ **Create feature branch** from master (never commit to master)
-- ✅ **Explain what you're doing** - User is learning Blazor/.NET
+- ✅ **Provide detailed guidance** - User is learning Blazor/.NET
+- ✅ **Review user implementations** thoroughly
 - ✅ **Update sprint log** after completing work
-- ✅ **Ask for approval** before pushing changes
-- ✅ **Use tools directly** - Read files, edit code, run commands
+- ✅ **Use read tools** - Read files, search codebase, understand context
 
 ### Don'ts ❌
 - ❌ **Don't skip reading documentation** - Critical context!
 - ❌ **Don't commit to master** - Always use feature branch
 - ❌ **Don't guess** - If unsure, ask user or search codebase
-- ❌ **Don't implement without explaining** - User is learning
+- ❌ **Don't implement code directly** - User implements with your guidance
 - ❌ **Don't forget to update sprint log** - Continuity is key
 - ❌ **Don't skip testing** - Verify changes work
 

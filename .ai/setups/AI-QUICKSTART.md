@@ -79,7 +79,7 @@
 
 1. **Always create GitHub issue first** for each phase
 2. **Always create feature branch** (never commit to master)
-3. **AI implements, user reviews** (use tools directly)
+3. **AI guides, user implements, AI reviews** (hands-on learning)
 4. **Explain as you code** (user is learning Blazor/.NET)
 5. **Update sprint log** after completing work
 6. **Ask for approval** before pushing
@@ -183,11 +183,11 @@ User is learning Blazor/.NET, so:
 1. **User asks for next phase**
 2. **AI creates GitHub issue** (title, description, acceptance criteria)
 3. **AI creates feature branch** (`feature/phase-X-Y`)
-4. **AI implements code** (using tools, explaining concepts)
-5. **User reviews in IDE** (asks questions, suggests changes)
-6. **AI updates sprint log** (what was done, learnings, time spent)
-7. **User approves changes**
-8. **AI commits and pushes** to feature branch
+4. **AI provides implementation guidance** (detailed guidance, explaining concepts)
+5. **User implements code in IDE** (asks questions, follows guidance)
+6. **AI reviews implementation** (provides feedback, suggests improvements)
+7. **AI updates sprint log** (what was done, learnings, time spent)
+8. **User commits and pushes** to feature branch (with AI approval)
 9. **User creates PR and merges** on GitHub
 10. **Repeat** for next phase
 

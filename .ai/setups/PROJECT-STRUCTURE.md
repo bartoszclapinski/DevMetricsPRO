@@ -170,6 +170,7 @@ DevMetricsPRO/
 - ✅ `POST /api/github/commits/sync/{repositoryId}` - Sync commits for repository (Phase 2.4) ✅
 - ✅ `GET /api/github/commits/recent?limit=10` - Get recent commits (Phase 2.4) ✅
 - ✅ `POST /api/github/pull-requests/sync/{repositoryId}` - Sync PRs for repository (Phase 2.6) ✅
+- ✅ `GET /api/github/pull-requests?repositoryId={guid}&status={all|open|closed|merged}` - Get PRs from database (Phase 2.6.5) ✅
 - ✅ `POST /api/github/sync-all` - Trigger full sync background job (Phase 2.5) ✅
 
 ### Blazor Pages
@@ -180,6 +181,7 @@ DevMetricsPRO/
 | `Components/Pages/Login.razor` | `/login` | User login | ✅ Working |
 | `Components/Pages/Register.razor` | `/register` | User registration | ✅ Working |
 | `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36 repos) | ✅ Working (Redesigned) |
+| `Components/Pages/PullRequests.razor` | `/pull-requests` | Display PRs with filtering (repo, status) | ✅ Working (Phase 2.6.5) |
 | `Components/Pages/Test.razor` | `/test` | Test page for development | ✅ Working |
 | `Components/Pages/Weather.razor` | `/weather` | Demo page | ✅ Working |
 | `Components/Pages/Counter.razor` | `/counter` | Demo page | ✅ Working |

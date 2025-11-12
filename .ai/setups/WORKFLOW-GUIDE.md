@@ -9,12 +9,12 @@ This document describes the **issue-driven, guided-implementation** workflow use
 ### 1. **Issue-Driven Development**
 Every feature, phase, or significant change MUST have a GitHub issue created first.
 
-### 2. **AI Implements, User Reviews**
-- The **AI implements code directly** using available tools
-- The **AI explains** what is being implemented and why as it works
-- The **USER reviews** the implementation in their IDE
-- The **USER approves or requests changes** before committing
-- The **USER learns** by understanding the implemented code and concepts
+### 2. **AI Guides, User Implements, AI Reviews**
+- The **AI provides guidance** on what needs to be implemented and how
+- The **AI explains** what should be implemented and why
+- The **USER implements** the code in their IDE based on AI guidance
+- The **AI reviews** the user's implementation and provides feedback
+- The **USER learns** by hands-on coding with expert guidance
 - **Both collaborate** on architecture and design decisions
 
 ### 3. **Learning-First Approach**
@@ -62,43 +62,45 @@ git checkout -b sprint1/phase1.X-feature-name-#IssueNumber
 - `sprintX/phaseY.Z-feature-name-#IssueNumber`
 - Example: `sprint1/phase1.4-logging-error-handling-#26`
 
-### Step 3: AI Implements Code
-**AI implements the code directly using tools:**
+### Step 3: AI Provides Implementation Guidance
+**AI guides what needs to be implemented:**
 
 ```
 Now let's implement [Feature].
 
-I'll create [File] at [path]:
+You need to create [File] at [path]:
 
 [AI explains what this file does and why]
-[AI uses write/search_replace tools to create/modify files]
-[AI explains the code as it's being written]
+[AI provides code structure/examples to implement]
+[AI explains the patterns and conventions to follow]
 
-Here's what I've implemented:
-[Summary of changes]
+Here's what you need to implement:
+[Detailed guidance and code examples]
 
-Please review the changes in your IDE and let me know if you approve!
+Please implement this in your IDE and let me know when you're done so I can review!
 ```
 
-### Step 4: User Reviews Implementation
-**USER reviews the code in their IDE:**
+### Step 4: User Implements Code
+**USER implements the code in their IDE:**
 
 ```
-[User reviews files in IDE]
-[User reads the explanations]
-[User asks questions if unclear]
+[User creates/modifies files based on AI guidance]
+[User follows patterns and conventions explained by AI]
+[User asks questions if unclear during implementation]
 
-User: Looks good! / Can you change X?
+User: I've implemented the code. Please review it!
 ```
 
-### Step 5: AI Responds to Feedback
-**AI addresses any feedback:**
+### Step 5: AI Reviews Implementation
+**AI reviews the user's code and provides feedback:**
 
 ```
-[If changes requested, AI makes adjustments]
-[AI explains the changes]
+[AI reviews the implemented code]
+[AI provides feedback on correctness, patterns, improvements]
+[AI explains any needed adjustments]
 
-Ready to commit? Or would you like any other changes?
+Your implementation looks great! / Please adjust X for Y reason.
+Ready to commit? Or would you like to make any changes?
 ```
 
 ### Step 6: Push Changes
@@ -168,11 +170,11 @@ git pull origin master
 4. Plan today's focus
 
 ### During Development (2-3 hours)
-1. **AI implements**: "Let's implement [Feature]..." [uses tools]
-2. **User reviews**: "Ok, looks good..." [reviews in IDE]
-3. **AI explains**: "Here's what this does and why..."
+1. **AI guides**: "Let's implement [Feature]..." [provides detailed guidance]
+2. **User implements**: "I'll code this..." [implements in IDE]
+3. **AI reviews**: "Your code looks good, but consider..." [reviews and provides feedback]
 4. **Repeat** for each step in the phase
-5. **AI commits** after each working step (with user approval)
+5. **User commits** after each working step (with AI approval)
 
 ### End of Phase
 1. **Run tests**: Verify everything works
@@ -237,18 +239,18 @@ chore(deps): update EF Core to version 9.0.0
 
 ### When Implementing
 **AI does:**
-- Implements code directly using tools
-- Explains WHAT is being implemented
+- Provides detailed guidance on what to implement
+- Explains WHAT should be implemented
 - Explains WHY we're doing it
 - Provides context about architecture fit
-- Shows expected outcomes
+- Shows expected code patterns and examples
 
 **USER:**
-- Reviews changes in IDE
-- Asks questions when unclear
-- Approves or requests changes
+- Implements code in their IDE based on guidance
+- Asks questions when unclear during implementation
+- Shows implementation to AI for review
 - Tests implementation locally
-- Learns by understanding the code
+- Learns by hands-on coding with expert guidance
 
 ### When Reviewing
 **AI checks:**
@@ -284,25 +286,25 @@ AI answers:
 
 ### AI Must NOT
 - ❌ Skip creating GitHub issues
-- ❌ Commit without user awareness
+- ❌ Implement code directly (user implements)
 - ❌ Assume user understanding without asking
 - ❌ Rush through explanations
-- ❌ Skip testing steps
-- ❌ Implement without explaining WHY
+- ❌ Skip reviewing user's implementations
+- ❌ Provide guidance without explaining WHY
 
 ### AI Must ALWAYS
 - ✅ Create GitHub issues first
-- ✅ Implement code using available tools
-- ✅ Explain what is being implemented and why
-- ✅ Wait for user approval before committing
-- ✅ Use conventional commit messages
-- ✅ Verify each step works
+- ✅ Provide detailed implementation guidance
+- ✅ Explain what should be implemented and why
+- ✅ Review user's implementations thoroughly
+- ✅ Guide on conventional commit messages
+- ✅ Help verify each step works
 - ✅ Update sprint log with user
 
 ### User Must ALWAYS
-- ✅ Review AI-implemented changes in IDE
-- ✅ Ask questions when unclear
-- ✅ Approve changes before committing
+- ✅ Implement code based on AI guidance
+- ✅ Ask questions when unclear during implementation
+- ✅ Show implementations to AI for review before committing
 - ✅ Test locally after implementation
 - ✅ Create PRs for all changes
 - ✅ Verify sprint log is updated
@@ -475,7 +477,8 @@ This workflow is working well when:
 
 - ✅ Every change has a GitHub issue
 - ✅ All work happens on feature branches
-- ✅ User implements all code (not AI)
+- ✅ User implements all code with AI guidance
+- ✅ AI reviews user implementations thoroughly
 - ✅ Explanations are clear and helpful
 - ✅ Sprint log is kept up to date
 - ✅ Conventional commits are used consistently
@@ -525,5 +528,5 @@ This workflow is working well when:
 **Sprint**: Sprint 2 - Phases 2.1-2.4 Complete + UI Redesign Complete ✅  
 **Next Phase**: Phase 2.5 - Hangfire Background Jobs
 
-**Note**: This workflow reflects the **actual practice** where **AI implements code directly** using available tools while **USER reviews and approves** in their IDE. This approach combines efficiency with learning - AI implements patterns consistently while explaining concepts, and user learns by understanding and reviewing high-quality code.
+**Note**: This workflow reflects the **actual practice** where **USER implements code** based on **AI guidance and review**. This approach maximizes learning - user gains hands-on coding experience with expert guidance and feedback, ensuring both skill development and high-quality code.
 
