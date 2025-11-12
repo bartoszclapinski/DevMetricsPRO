@@ -1,0 +1,452 @@
+@page "/pull-requests"
+@using DevMetricsPro.Web.Services
+@inject AuthStateService AuthState
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ILogger<PullRequests> Logger
+@inject ISnackbar Snackbar
+
+<PageTitle>Pull Requests - DevMetrics Pro</PageTitle>
+
+<h1 style="font-size: 24px; margin-bottom: 24px; color: var(--text-primary); font-weight: 600;">Pull Requests</h1>
+
+@if (!_isAuthenticated)
+{
+    <div style="padding: 16px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid var(--warning); border-radius: var(--border-radius);">
+        <div style="font-size: 14px; color: var(--text-primary);">
+            Please <a href="/login" style="color: var(--info); text-decoration: underline;">login</a> to view pull requests.
+        </div>
+    </div>
+}
+else if (!_isGitHubConnected)
+{
+    <div style="padding: 16px; background: rgba(3, 102, 214, 0.1); border-left: 3px solid var(--info); border-radius: var(--border-radius);">
+        <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 12px;">
+            You haven't connected your GitHub account yet.
+        </div>
+        <a href="/" class="panel-action" style="text-decoration: none; display: inline-block;">
+            Go to Dashboard to Connect GitHub
+        </a>
+    </div>
+}
+else if (_isLoading)
+{
+    <div style="display: flex; justify-content: center; align-items: center; min-height: 400px;">
+        <div style="font-size: 14px; color: var(--text-tertiary);">Loading pull requests...</div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div style="padding: 16px; background: rgba(215, 58, 73, 0.1); border-left: 3px solid var(--danger); border-radius: var(--border-radius); margin-bottom: 24px;">
+        <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 12px;">
+            @_errorMessage
+        </div>
+        <button class="panel-action" @onclick="LoadPullRequestsAsync">
+            Retry
+        </button>
+    </div>
+}
+else if (_pullRequests.Count == 0)
+{
+    <DataPanel Title="No Pull Requests">
+        <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔀</div>
+            <div style="font-size: 16px; margin-bottom: 8px; color: var(--text-primary);">No Pull Requests Found</div>
+            <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;">
+                Pull requests will appear here after they are synced from GitHub.
+            </div>
+            <button class="panel-action" @onclick="SyncAllPullRequestsAsync" disabled="@_isSyncing"
+                    style="padding: 8px 16px; background: var(--info); color: white;">
+                @if (_isSyncing)
+                {
+                    <span>Syncing...</span>
+                }
+                else
+                {
+                    <span>Sync All PRs</span>
+                }
+            </button>
+        </div>
+    </DataPanel>
+}
+else
+{
+    <!-- Header with Filters and Sync Button -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+            <div style="font-size: 14px; color: var(--text-secondary);">
+                @_pullRequests.Count pull requests
+            </div>
+
+            <!-- Repository Filter -->
+            <select class="control-select" @onchange="OnRepositoryFilterChanged">
+                <option value="">All Repositories</option>
+                @foreach (var repo in _repositories)
+                {
+                    <option value="@repo.Id">@repo.Name</option>
+                }
+            </select>
+
+            <!-- Status Filter -->
+            <select class="control-select" @onchange="OnStatusFilterChanged" value="@_statusFilter">
+                <option value="all">All Status</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="merged">Merged</option>
+            </select>
+        </div>
+
+        <button class="panel-action" @onclick="SyncAllPullRequestsAsync" disabled="@_isSyncing"
+                style="padding: 8px 16px; background: var(--info); color: white;">
+            @if (_isSyncing)
+            {
+                <span>Syncing...</span>
+            }
+            else
+            {
+                <span>⟳ Sync All PRs</span>
+            }
+        </button>
+    </div>
+
+    <!-- Pull Requests Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px;">
+        @foreach (var pr in _pullRequests)
+        {
+            <div class="panel" style="height: 100%; display: flex; flex-direction: column;">
+                <div style="padding: 16px; flex: 1;">
+                    <!-- PR Number and Status Badge -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text-tertiary);">
+                            #@pr.ExternalId
+                        </span>
+                        @if (pr.Status == "Merged")
+                        {
+                            <StatusBadge Text="Merged" Type="StatusBadge.StatusType.Success" />
+                        }
+                        else if (pr.Status == "Open")
+                        {
+                            <StatusBadge Text="Open" Type="StatusBadge.StatusType.Info" />
+                        }
+                        else
+                        {
+                            <StatusBadge Text="Closed" Type="StatusBadge.StatusType.Danger" />
+                        }
+                    </div>
+
+                    <!-- PR Title -->
+                    <a href="@pr.Url" target="_blank" style="color: var(--info); text-decoration: none; font-size: 15px; font-weight: 600; display: block; margin-bottom: 12px; line-height: 1.4;">
+                        @(pr.Title.Length > 80 ? pr.Title.Substring(0, 80) + "..." : pr.Title)
+                    </a>
+
+                    <!-- Repository Name -->
+                    <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
+                        📦 @pr.RepositoryName
+                    </div>
+
+                    <!-- Author -->
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                        👤 @pr.AuthorName (@("@" + pr.AuthorUsername))
+                    </div>
+
+                    <!-- Dates -->
+                    <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
+                        @if (pr.MergedAt.HasValue)
+                        {
+                            <div>✅ Merged @GetRelativeTime(pr.MergedAt.Value)</div>
+                        }
+                        else if (pr.ClosedAt.HasValue)
+                        {
+                            <div>❌ Closed @GetRelativeTime(pr.ClosedAt.Value)</div>
+                        }
+                        else
+                        {
+                            <div>🕐 Opened @GetRelativeTime(pr.CreatedAt)</div>
+                        }
+                    </div>
+
+                    <!-- Updated Time -->
+                    <div class="text-small text-muted" style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                        Updated @GetRelativeTime(pr.UpdatedAt)
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _isAuthenticated = false;
+    private bool _isGitHubConnected = false;
+    private bool _isLoading = true;
+    private bool _isSyncing = false;
+    private string _errorMessage = string.Empty;
+    private List<PullRequestDto> _pullRequests = new();
+    private List<PullRequestDto> _allPullRequests = new(); // Store all PRs for filtering
+    private List<RepositoryDto> _repositories = new();
+    private string _statusFilter = "all";
+    private string _repositoryFilter = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+
+        if (!_isAuthenticated)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        await CheckGitHubConnectionAsync();
+
+        if (_isGitHubConnected)
+        {
+            await LoadRepositoriesAsync();
+            await LoadPullRequestsAsync();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task CheckGitHubConnectionAsync()
+    {
+        try
+        {
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                _isGitHubConnected = false;
+                return;
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/status");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GitHubStatusResponse>();
+                _isGitHubConnected = result?.Connected ?? false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking GitHub connection status");
+            _isGitHubConnected = false;
+        }
+    }
+
+    private async Task LoadRepositoriesAsync()
+    {
+        try
+        {
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token)) return;
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/github/sync-repositories");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<SyncRepositoriesResponse>();
+                if (result?.Success == true && result.Repositories != null)
+                {
+                    _repositories = result.Repositories.OrderBy(r => r.Name).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading repositories");
+        }
+    }
+
+    private async Task LoadPullRequestsAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _errorMessage = string.Empty;
+
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                _errorMessage = "Authentication token not found. Please login again.";
+                return;
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/pull-requests");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GetPullRequestsResponse>();
+                if (result?.Success == true && result.PullRequests != null)
+                {
+                    _allPullRequests = result.PullRequests;
+                    ApplyFilters();
+                }
+            }
+            else
+            {
+                _errorMessage = $"Failed to load pull requests. Status: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading pull requests");
+            _errorMessage = "An error occurred while loading pull requests. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SyncAllPullRequestsAsync()
+    {
+        try
+        {
+            _isSyncing = true;
+            _errorMessage = string.Empty;
+
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                Snackbar.Add("Authentication token not found", Severity.Error);
+                return;
+            }
+
+            // Trigger full sync background job
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/github/sync-all");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Pull requests sync started. This may take a minute...", Severity.Info);
+
+                // Wait a bit then reload
+                await Task.Delay(3000);
+                await LoadPullRequestsAsync();
+
+                Snackbar.Add("Pull requests synced successfully!", Severity.Success);
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to sync pull requests: {errorContent}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error syncing pull requests");
+            Snackbar.Add("An error occurred while syncing pull requests", Severity.Error);
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    private void OnRepositoryFilterChanged(ChangeEventArgs e)
+    {
+        _repositoryFilter = e.Value?.ToString() ?? "";
+        ApplyFilters();
+    }
+
+    private void OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        _statusFilter = e.Value?.ToString() ?? "all";
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var filtered = _allPullRequests.AsEnumerable();
+
+        // Filter by repository
+        if (!string.IsNullOrEmpty(_repositoryFilter))
+        {
+            filtered = filtered.Where(pr => pr.RepositoryId.ToString() == _repositoryFilter);
+        }
+
+        // Filter by status
+        if (_statusFilter != "all")
+        {
+            filtered = filtered.Where(pr => pr.Status.Equals(_statusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        _pullRequests = filtered.ToList();
+    }
+
+    private string GetRelativeTime(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+
+        if (timeSpan.TotalMinutes < 1)
+            return "just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes} minutes ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours} hours ago";
+        if (timeSpan.TotalDays < 30)
+            return $"{(int)timeSpan.TotalDays} days ago";
+        if (timeSpan.TotalDays < 365)
+            return $"{(int)(timeSpan.TotalDays / 30)} months ago";
+
+        return $"{(int)(timeSpan.TotalDays / 365)} years ago";
+    }
+
+    // Internal response classes for API
+    private class GitHubStatusResponse
+    {
+        public bool Connected { get; set; }
+        public string? Username { get; set; }
+    }
+
+    private class GetPullRequestsResponse
+    {
+        public bool Success { get; set; }
+        public int Total { get; set; }
+        public List<PullRequestDto> PullRequests { get; set; } = new();
+    }
+
+    private class PullRequestDto
+    {
+        public Guid Id { get; set; }
+        public string ExternalId { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public bool IsMerged { get; set; }
+        public string AuthorName { get; set; } = string.Empty;
+        public string AuthorUsername { get; set; } = string.Empty;
+        public string RepositoryName { get; set; } = string.Empty;
+        public Guid RepositoryId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public DateTime? ClosedAt { get; set; }
+        public DateTime? MergedAt { get; set; }
+        public string? Url { get; set; }
+    }
+
+    private class SyncRepositoriesResponse
+    {
+        public bool Success { get; set; }
+        public int Count { get; set; }
+        public List<RepositoryDto> Repositories { get; set; } = new();
+    }
+
+    private class RepositoryDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+}

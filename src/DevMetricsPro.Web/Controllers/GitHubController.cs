@@ -889,4 +889,94 @@ public class GitHubController : ControllerBase
             return StatusCode(500, new { message = "Failed to start sync job" });
         }
     }
+
+    /// <summary>
+    /// Get all pull requests from database with optional filtering
+    /// </summary>
+    [HttpGet("pull-requests")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPullRequests(
+        [FromQuery] Guid? repositoryId = null,
+        [FromQuery] string? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Get authenticated user
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { error = "User not authenticated" });
+            }
+
+            // Fetch pull requests from database
+            var prRepository = _unitOfWork.Repository<PullRequest>();
+            var pullRequests = await prRepository.GetAllAsync(cancellationToken);
+
+            // Filter by repository if provided
+            if (repositoryId.HasValue)
+            {
+                pullRequests = pullRequests.Where(pr => pr.RepositoryId == repositoryId.Value);
+            }
+
+            // Filter by status if provided
+            if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+            {
+                var prStatus = status.ToLower() switch
+                {
+                    "open" => PullRequestStatus.Open,
+                    "closed" => PullRequestStatus.Closed,
+                    "merged" => PullRequestStatus.Merged,                    
+                    _ => (PullRequestStatus?)null
+                };
+
+                if (prStatus.HasValue)
+                {
+                    pullRequests = pullRequests.Where(pr => pr.Status == prStatus.Value);
+                }
+            }
+
+            // Order by most recent first
+            var sortedPRs = pullRequests
+                .OrderByDescending(pr => pr.UpdatedAt)
+                .Select(pr => new
+                {
+                    id = pr.Id,
+                    externalId = pr.ExternalId,
+                    title = pr.Title,
+                    description = pr.Description,
+                    status = pr.Status.ToString(),
+                    isMerged = pr.Status == PullRequestStatus.Merged,
+                    authorName = pr.Author?.DisplayName ?? "Unknown",
+                    authorUsername = pr.Author?.GitHubUsername ?? "Unknown",
+                    repositoryName = pr.Repository?.Name ?? "Unknown",
+                    repositoryId = pr.RepositoryId,
+                    createdAt = pr.CreatedAt,
+                    updatedAt = pr.UpdatedAt,
+                    closedAt = pr.ClosedAt,
+                    mergedAt = pr.MergedAt,
+                    // GitHub URL format https://github.com/{owner}/{repository}/pull/{externalId}
+                    url = pr.Repository?.FullName != null ? 
+                    $"https://github.com/{pr.Repository?.FullName}/pull/{pr.ExternalId}" : null
+                })
+                .ToList();
+
+                _logger.LogInformation("Fetched {Count} pull requests from database", sortedPRs.Count);
+
+                return Ok(new
+                {
+                    success = true,
+                    count = sortedPRs.Count,
+                    pullRequests = sortedPRs
+                });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching pull requests from database");
+            return StatusCode(500, new { message = "Failed to fetch pull requests from database" , detail = ex.Message });
+        }
+    }
+    
 }
