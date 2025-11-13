@@ -86,6 +86,9 @@ try
     builder.Services.AddScoped<IGitHubCommitsService, GitHubCommitsService>();
     builder.Services.AddScoped<IGitHubPullRequestService, GitHubPullRequestService>();
 
+    // Metrics Calculation Service
+    builder.Services.AddScoped<IMetricsCalculationService, MetricsCalculationService>();
+
     // Background Jobs
     builder.Services.AddScoped<DevMetricsPro.Web.Jobs.SyncGitHubDataJob>();
 
