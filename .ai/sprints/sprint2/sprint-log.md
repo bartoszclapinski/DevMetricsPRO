@@ -1066,33 +1066,123 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
-### Day 10 - __________
+### Day 10 - November 13, 2025
 **Phases completed**:
-- [ ] Phase 2.7: Basic Metrics Calculation
+- [x] Phase 2.7.1: Create Metrics Calculation Service ✅
+- [x] Phase 2.7.2: Integrate Metrics into Background Job ✅
 
 **What I learned**:
--
--
 
-**Time spent**: ___ hours
-**Blockers**: None / [describe]
-**Notes**: 
+**Phase 2.7.1 - Metrics Calculation Service:**
+- Created `IMetricsCalculationService` interface in Application layer
+  - `CalculateMetricsForDeveloperAsync(developerId, startDate, endDate)` - single developer
+  - `CalculateMetricsForAllDevelopersAsync()` - all developers with 30-day default range
+- Implemented `MetricsCalculationService` in Infrastructure layer
+  - Calculates 5 basic metrics per developer:
+    1. **Total Commits** (`MetricType.Commits`) - Count of all commits
+    2. **Lines Added** (`MetricType.LinesAdded`) - Sum of additions
+    3. **Lines Removed** (`MetricType.LinesRemoved`) - Sum of deletions
+    4. **Pull Request Count** (`MetricType.PullRequests`) - Count of PRs authored
+    5. **Active Days** (`MetricType.ActiveDays`) - Distinct days with at least 1 commit
+  - Uses **upsert logic**: check if metric exists → update if yes, create if no
+  - Stores metadata as JSON: `{"startDate":"2024-10-15","endDate":"2024-11-15"}`
+  - Queries all commits and PRs from database, filters by developer and date range
+  - Comprehensive logging for each metric calculated
+  - Error handling per developer (continues processing if one fails)
+- Registered service in DI container (`Program.cs`)
+- Service is testable independently before background job integration
+
+**Phase 2.7.2 - Background Job Integration:**
+- Updated `SyncGitHubDataJob` to integrate metrics calculation
+- Injected `IMetricsCalculationService` into job constructor
+- Added **Step 4/4** after PR sync: "Calculating developer metrics..."
+- Calls `CalculateMetricsForAllDevelopersAsync()` with error handling
+- Updated step logging to show progress (1/4, 2/4, 3/4, 4/4)
+- Metrics calculation wrapped in try-catch (won't break sync if fails)
+- Updated final completion message to mention metrics
+
+**Background job now executes 4 steps**:
+1. Sync repositories from GitHub
+2. Sync commits for each repository
+3. Sync pull requests for each repository
+4. Calculate metrics for all developers ✅ **NEW!**
+
+**Key Concepts:**
+- **Metrics vs Raw Data**: Metrics are aggregated/calculated values stored separately from raw data (commits, PRs)
+  - Raw data: Individual commits with lines added/removed
+  - Metrics: Aggregated totals per developer
+  - Why: Fast dashboard queries, no need to recalculate every time
+- **Upsert Pattern**: Check exists → update vs create
+  - Prevents duplicate metrics for same developer/type
+  - Updates timestamp and value on each calculation
+- **Date Range Strategy**: Last 30 days for MVP
+  - Future: Support custom ranges (weekly, monthly, yearly)
+  - Stored in metadata JSON for traceability
+- **Metrics Table**: Already existed from Sprint 1
+  - `DeveloperId`, `Type` (enum), `Value` (decimal), `Timestamp`, `Metadata`
+- **Service Layer Separation**: Business logic (Application) vs Implementation (Infrastructure)
+- **Error Isolation**: Metrics failure doesn't break data sync
+  - Continue processing other developers if one fails
+  - Log errors but don't throw (graceful degradation)
+
+**Challenges:**
+- None - straightforward implementation following established patterns
+- Clean Architecture makes adding new services easy
+
+**Testing:**
+- ✅ Solution builds: 0 errors, 0 warnings (both phases)
+- ✅ Service can be called independently (Phase 2.7.1)
+- ✅ Background job now has 4 steps (Phase 2.7.2)
+- Can trigger via `POST /api/github/sync-all`
+- Check Hangfire dashboard for 4-step execution
+- Query `Metrics` table to verify calculations
+
+**Technical Achievements:**
+- Completed final phase of Sprint 2! 🎉
+- Full data pipeline working: GitHub → Sync → Storage → Metrics
+- Automatic metrics calculation on every sync
+- Foundation ready for dashboard visualization (Sprint 3)
+
+**Time spent**: ~4 hours total (~2.5 hours for 2.7.1, ~1.5 hours for 2.7.2)
+**Week 2 total**: ~12 hours
+**Sprint 2 total**: ~30 hours
+**Blockers**: None
+**Notes**:
+- **SPRINT 2 IS COMPLETE!** All phases done ✅
+- Issues #85 and #86 closed
+- Feature branches: `sprint2/phase2.7.1-metrics-service-#85` and `sprint2/phase2.7.2-metrics-background-job-#86`
+- Ready for Sprint 3: Real-time Dashboard & Analytics
+- System now calculates: commits, lines changed, PRs, active days per developer
+- Metrics updated automatically every time GitHub data syncs
 
 ---
 
-### Day 11 - __________
-**Phases completed**:
-- [ ] Phase 2.8: Week 2 Wrap-up
+### Sprint 2 Completion Summary
 
-**What I learned**:
--
--
+**Status**: ✅ **COMPLETE** - All phases finished!
 
-**Time spent**: ___ hours
-**Week 2 total**: ~__ hours
-**Sprint 2 total**: ~__ hours
-**Blockers**: None / [describe]
-**Notes**: 
+**What Was Built**:
+- ✅ GitHub OAuth integration (secure token storage)
+- ✅ Repository sync (36 repos synced)
+- ✅ Commit sync with incremental updates
+- ✅ Pull Request sync (all statuses)
+- ✅ Background jobs with Hangfire
+- ✅ Metrics calculation system (5 metrics)
+- ✅ Professional UI redesign
+- ✅ Pages: Home, Repositories, Pull Requests
+- ✅ Components: MetricCard, DataPanel, StatusBadge
+
+**Total Sub-phases**: 23 (across 7 main phases + UI redesign)
+
+**Key Achievements**:
+- Clean Architecture maintained throughout
+- Full GitHub integration working end-to-end
+- Automated data sync with error handling
+- Metrics foundation for analytics dashboard
+- Professional, data-dense UI design
+- Pattern consistency across all features
+
+**Ready for Sprint 3**: Real-time dashboard, charts, leaderboards, team analytics! 
 
 ---
 
