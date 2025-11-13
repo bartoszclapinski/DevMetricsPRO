@@ -15,6 +15,7 @@ public class SyncGitHubDataJob
     private readonly IGitHubRepositoryService _repositoryService;
     private readonly IGitHubCommitsService _commitsService;
     private readonly IGitHubPullRequestService _pullRequestService;
+    private readonly IMetricsCalculationService _metricsService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<SyncGitHubDataJob> _logger;
@@ -23,6 +24,7 @@ public class SyncGitHubDataJob
         IGitHubRepositoryService repositoryService,
         IGitHubCommitsService commitsService,
         IGitHubPullRequestService pullRequestService,
+        IMetricsCalculationService metricsService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         ILogger<SyncGitHubDataJob> logger)
@@ -30,6 +32,7 @@ public class SyncGitHubDataJob
         _repositoryService = repositoryService;
         _commitsService = commitsService;
         _pullRequestService = pullRequestService;
+        _metricsService = metricsService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _logger = logger;
@@ -37,7 +40,7 @@ public class SyncGitHubDataJob
 
     /// <summary>
     /// Executes the GitHub data sync for a specific user.
-    /// This method syncs repositories first, then commits, then pull requests for each repository.
+    /// This method syncs repositories first, then commits, then pull requests, and finally calculates metrics.
     /// </summary>
     /// <param name="userId">The ID of the user to sync data for</param>
     public async Task ExecuteAsync(Guid userId)
@@ -61,7 +64,7 @@ public class SyncGitHubDataJob
             }
 
             // Step 1: Sync repositories
-            _logger.LogInformation("Syncing repositories for user {UserId}", userId);
+            _logger.LogInformation("Step 1/4: Syncing repositories for user {UserId}", userId);
             var repositories = await _repositoryService.GetUserRepositoriesAsync(
                 user.GitHubAccessToken, 
                 CancellationToken.None);
@@ -75,6 +78,7 @@ public class SyncGitHubDataJob
             _logger.LogInformation("Saved {Count} repositories to database", syncedRepos.Count);
 
             // Step 2: Sync commits for each repository
+            _logger.LogInformation("Step 2/4: Syncing commits for all repositories");
             var totalCommitsSynced = 0;
             foreach (var repo in syncedRepos)
             {
@@ -125,6 +129,7 @@ public class SyncGitHubDataJob
             }
 
             // Step 3: Sync pull requests for each repository
+            _logger.LogInformation("Step 3/4: Syncing pull requests for all repositories");
             var totalPRsSynced = 0;
             foreach (var repo in syncedRepos)
             {
@@ -173,9 +178,23 @@ public class SyncGitHubDataJob
                 }
             }
 
+            // Step 4: Calculate metrics for all developers
+            _logger.LogInformation("Step 4/4: Calculating developer metrics...");
+
+            try
+            {
+                await _metricsService.CalculateMetricsForAllDevelopersAsync(CancellationToken.None);
+                _logger.LogInformation("Successfully calculated metrics for all developers");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calculating metrics - sync job will continue");
+                // Don't throw - we don't want metrics failure to break the entire sync
+            }
+
             _logger.LogInformation(
                 "GitHub data sync completed for user {UserId}. " +
-                "Synced {RepoCount} repositories, {CommitCount} commits, and {PRCount} pull requests",
+                "Synced {RepoCount} repositories, {CommitCount} commits, {PRCount} pull requests, and calculated metrics",
                 userId, syncedRepos.Count, totalCommitsSynced, totalPRsSynced);
         }
         catch (Exception ex)
