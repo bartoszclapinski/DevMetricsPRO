@@ -19,12 +19,14 @@ Each phase builds on the previous, allowing incremental testing and validation.
 ## 🎯 Sprint Goals
 
 - ✅ GitHub OAuth integration complete (Phase 2.1) ✅
-- [ ] GitHub tokens stored securely in database
-- [ ] Repositories fetched from GitHub API
-- [ ] Commits synced in background
-- [ ] Pull requests fetched and stored
-- [ ] Basic metrics calculated
-- [ ] Hangfire configured for background jobs
+- ✅ GitHub tokens stored securely in database (Phase 2.2) ✅
+- ✅ Repositories fetched from GitHub API (Phase 2.3) ✅
+- ✅ Commits synced in background (Phase 2.4) ✅
+- ✅ Pull requests fetched and stored (Phase 2.6) ✅
+- ✅ Basic metrics calculated (Phase 2.7) ✅
+- ✅ Hangfire configured for background jobs (Phase 2.5) ✅
+
+**Status**: ✅ **ALL GOALS COMPLETE - SPRINT 2 FINISHED!** 🎉
 
 ---
 
@@ -375,51 +377,39 @@ Each phase builds on the previous, allowing incremental testing and validation.
 
 ---
 
-## Phase 2.7: Basic Metrics Calculation (Day 9)
+## Phase 2.7: Basic Metrics Calculation ✅ (Completed Nov 13, 2025)
+
+**Status**: ✅ Complete
+**Issues**: #85 (Phase 2.7.1), #86 (Phase 2.7.2)
+**Branches**: `sprint2/phase2.7.1-metrics-service-#85`, `sprint2/phase2.7.2-metrics-background-job-#86`
 
 **Goal**: Calculate and store developer metrics
 
-### Step 2.7.1: Create Metrics Service
+### Phase 2.7.1: Create Metrics Service ✅
 
-- [ ] **Create `IMetricsCalculationService`**:
-  ```csharp
-  Task CalculateMetricsForDeveloperAsync(Guid developerId, DateTime startDate, DateTime endDate);
-  Task CalculateMetricsForAllDevelopersAsync();
-  ```
+- ✅ **Created `IMetricsCalculationService`** in Application layer
+- ✅ **Implemented `MetricsCalculationService`** in Infrastructure layer
+- ✅ **Calculates 5 basic metrics per developer**:
+  - Total Commits (`MetricType.Commits`)
+  - Lines Added (`MetricType.LinesAdded`)
+  - Lines Removed (`MetricType.LinesRemoved`)
+  - Pull Request Count (`MetricType.PullRequests`)
+  - Active Days (`MetricType.ActiveDays`)
+- ✅ **Stores metrics in Metrics table** with upsert logic
+- ✅ **Date range support**: Default 30 days, metadata stored as JSON
+- ✅ **Registered in DI container**
+- ✅ **Tested**: Service works independently, calculations verified
 
-- [ ] **Implement basic metrics**:
-  - Commit count per developer
-  - Lines added/removed
-  - PR count (opened, merged)
-  - Active days (days with at least 1 commit)
+### Phase 2.7.2: Integrate into Background Job ✅
 
-- [ ] **Store in Metrics table**:
-  - Link to Developer
-  - Store MetricType and Value
-  - Store date range
+- ✅ **Updated `SyncGitHubDataJob`** with Step 4: Calculate metrics
+- ✅ **Injected `IMetricsCalculationService`** into job
+- ✅ **Metrics calculated after PR sync** automatically
+- ✅ **Error handling**: Metrics failure doesn't break sync
+- ✅ **Comprehensive logging**: 4-step progress (1/4, 2/4, 3/4, 4/4)
+- ✅ **Tested**: Background job executes all 4 steps, Metrics table populated
 
-**✅ Test**:
-- Calculate metrics for one developer
-- Verify values in database
-- Check calculations are correct
-
----
-
-### Step 2.7.2: Add to Background Job
-
-- [ ] **Update `SyncGitHubDataJob`**:
-  - Add metrics calculation step
-  - Run after data sync
-
-- [ ] **Schedule separate metrics job**:
-  - Run daily at midnight
-  - Recalculate all metrics
-
-**✅ Test**:
-- Background job calculates metrics
-- Dashboard shows updated metrics
-
-**Time Estimate**: 4 hours
+**Time Spent**: ~4 hours (~2.5h for 2.7.1, ~1.5h for 2.7.2)
 
 ---
 

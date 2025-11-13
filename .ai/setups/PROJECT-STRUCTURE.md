@@ -95,6 +95,7 @@ DevMetricsPRO/
 | `Interfaces/IGitHubRepositoryService.cs` | `GetUserRepositoriesAsync()` | Fetch repos from GitHub API |
 | `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API (Phase 2.4) ✅ |
 | `Interfaces/IGitHubPullRequestService.cs` | `GetRepositoryPullRequestsAsync()` | Fetch PRs from GitHub API (Phase 2.6) ✅ |
+| `Interfaces/IMetricsCalculationService.cs` | `CalculateMetricsForDeveloperAsync()`, `CalculateMetricsForAllDevelopersAsync()` | Calculate developer metrics (Phase 2.7) ✅ |
 
 ---
 
@@ -136,6 +137,7 @@ DevMetricsPRO/
 | `Services/GitHubRepositoryService.cs` | `IGitHubRepositoryService` | Fetch repos using Octokit.NET |
 | `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET (Phase 2.4) ✅ |
 | `Services/GitHubPullRequestService.cs` | `IGitHubPullRequestService` | Fetch PRs using Octokit.NET (Phase 2.6) ✅ |
+| `Services/MetricsCalculationService.cs` | `IMetricsCalculationService` | Calculate 5 developer metrics from commits/PRs (Phase 2.7) ✅ |
 
 ### Migrations
 
