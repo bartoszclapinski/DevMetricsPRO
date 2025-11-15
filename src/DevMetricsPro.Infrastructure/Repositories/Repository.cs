@@ -53,6 +53,14 @@ public class Repository<T> : IRepository<T> where T : class
     }
 
     /// <summary>
+    /// Returns an IQueryable with AsNoTracking for composing read-only queries
+    /// </summary>
+    public IQueryable<T> Query()
+    {
+        return _dbSet.AsNoTracking();
+    }
+
+    /// <summary>
     /// Add a new entity
     /// </summary>
     public async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)

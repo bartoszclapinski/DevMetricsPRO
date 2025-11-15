@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
 using DevMetricsPro.Core.Interfaces;
@@ -72,16 +73,20 @@ public class MetricsCalculationServiceTests
         };
 
         var commitRepoMock = new Mock<IRepository<Commit>>();
-        commitRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(commits);
+        commitRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Commit, bool>> predicate, CancellationToken _) =>
+                commits.Where(predicate.Compile()).ToList());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pullRequests);
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<PullRequest, bool>> predicate, CancellationToken _) =>
+                pullRequests.Where(predicate.Compile()).ToList());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Metric>());
+        var metricsStore = new List<Metric>();
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Metric, bool>> predicate, CancellationToken _) =>
+                metricsStore.Where(predicate.Compile()).ToList());
 
         _unitOfWorkMock.Setup(u => u.Repository<Commit>()).Returns(commitRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.Repository<PullRequest>()).Returns(prRepoMock.Object);
@@ -116,16 +121,21 @@ public class MetricsCalculationServiceTests
         var startDate = DateTime.UtcNow.AddDays(-30);
         var endDate = DateTime.UtcNow;
 
+        var emptyCommits = new List<Commit>();
+        var emptyPrs = new List<PullRequest>();
+
         var commitRepoMock = new Mock<IRepository<Commit>>();
-        commitRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Commit>());
+        commitRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Commit, bool>> predicate, CancellationToken _) =>
+                emptyCommits.Where(predicate.Compile()).ToList());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<PullRequest>());
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<PullRequest, bool>> predicate, CancellationToken _) =>
+                emptyPrs.Where(predicate.Compile()).ToList());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Metric>());
 
         _unitOfWorkMock.Setup(u => u.Repository<Commit>()).Returns(commitRepoMock.Object);
@@ -161,15 +171,15 @@ public class MetricsCalculationServiceTests
             .ReturnsAsync(developers);
 
         var commitRepoMock = new Mock<IRepository<Commit>>();
-        commitRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        commitRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Commit>());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PullRequest>());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Metric>());
 
         _unitOfWorkMock.Setup(u => u.Repository<Developer>()).Returns(developerRepoMock.Object);
@@ -226,16 +236,21 @@ public class MetricsCalculationServiceTests
         };
 
         var commitRepoMock = new Mock<IRepository<Commit>>();
-        commitRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(commits);
+        commitRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Commit, bool>> predicate, CancellationToken _) =>
+                commits.Where(predicate.Compile()).ToList());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<PullRequest>());
+        var emptyPrList = new List<PullRequest>();
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<PullRequest, bool>> predicate, CancellationToken _) =>
+                emptyPrList.Where(predicate.Compile()).ToList());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Metric>());
+        var metricsStore = new List<Metric>();
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Metric, bool>> predicate, CancellationToken _) =>
+                metricsStore.Where(predicate.Compile()).ToList());
 
         _unitOfWorkMock.Setup(u => u.Repository<Commit>()).Returns(commitRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.Repository<PullRequest>()).Returns(prRepoMock.Object);
@@ -290,16 +305,21 @@ public class MetricsCalculationServiceTests
         };
 
         var commitRepoMock = new Mock<IRepository<Commit>>();
-        commitRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(commits);
+        commitRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Commit, bool>> predicate, CancellationToken _) =>
+                commits.Where(predicate.Compile()).ToList());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<PullRequest>());
+        var emptyPrsForExisting = new List<PullRequest>();
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<PullRequest, bool>> predicate, CancellationToken _) =>
+                emptyPrsForExisting.Where(predicate.Compile()).ToList());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Metric> { existingMetric });
+        var metricStore = new List<Metric> { existingMetric };
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Metric, bool>> predicate, CancellationToken _) =>
+                metricStore.Where(predicate.Compile()).ToList());
 
         _unitOfWorkMock.Setup(u => u.Repository<Commit>()).Returns(commitRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.Repository<PullRequest>()).Returns(prRepoMock.Object);
@@ -339,16 +359,16 @@ public class MetricsCalculationServiceTests
 
         var commitRepoMock = new Mock<IRepository<Commit>>();
         // First developer: throw error, second: return empty list
-        commitRepoMock.SetupSequence(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        commitRepoMock.SetupSequence(r => r.FindAsync(It.IsAny<Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Database error"))
             .ReturnsAsync(new List<Commit>());
 
         var prRepoMock = new Mock<IRepository<PullRequest>>();
-        prRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        prRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<PullRequest, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PullRequest>());
 
         var metricRepoMock = new Mock<IRepository<Metric>>();
-        metricRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        metricRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Metric, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Metric>());
 
         _unitOfWorkMock.Setup(u => u.Repository<Developer>()).Returns(developerRepoMock.Object);

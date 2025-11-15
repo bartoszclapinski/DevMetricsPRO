@@ -1248,6 +1248,38 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
+### Day 11 - November 14, 2025
+**Phases completed**:
+- [x] Phase 2.C.1: Testing & Quality
+- [x] Phase 2.C.2: Database Performance
+
+**Phase 2.C.1 highlights**:
+- Created dedicated `DevMetricsPro.Infrastructure.Tests` project with xUnit + FluentAssertions + Moq.
+- Added `MetricsCalculationServiceTests` covering happy paths, edge cases (no commits, date ranges, upsert logic), and multi-developer scenarios.
+- Achieved >95% line coverage on `MetricsCalculationService`; coverage report stored under `coverage/`.
+
+**Phase 2.C.2 highlights**:
+- Verified all required indexes already exist in EF configurations/migrations (no new migration needed).
+- Introduced `Query()` helper on `IRepository<T>` to expose `AsNoTracking()` IQueryable for read-only pipelines.
+- Refactored `MetricsCalculationService` to filter commits/PRs/metrics server-side (no more `.GetAllAsync()` + LINQ in memory).
+- Updated `GitHubController.GetRecentCommits` to query via EF with `Include` (avoiding N+1 and returning real author/repo names).
+- Added new unit-test arrangements to mock predicate-based repository queries.
+
+**Testing**:
+- `dotnet test tests/DevMetricsPro.Infrastructure.Tests/DevMetricsPro.Infrastructure.Tests.csproj`
+- All six tests pass after query refactor; verifies regressions around metrics calculations.
+
+**Notes / Learnings**:
+- Having a `Query()` helper keeps repository pattern intact while letting higher layers compose efficient LINQ queries.
+- Verified that proactive Includes eliminate the “Unknown Author/Repository” placeholders in dashboard without additional round-trips.
+- No migration required, but documenting the verification in the cleanup plan keeps future contributors aligned.
+
+---
+
+### Sprint 2 Completion Summary
+
+---
+
 ## 🔄 Sprint Retrospective
 
 _(To be completed at end of sprint)_
