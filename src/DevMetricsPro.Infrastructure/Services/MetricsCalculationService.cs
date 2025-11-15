@@ -43,19 +43,19 @@ public class MetricsCalculationService : IMetricsCalculationService
             var metricRepo = _unitOfWork.Repository<Metric>();
 
             // Get all commits for developer in date range
-            var allCommits = await commitRepo.GetAllAsync(cancellationToken);
-            var commits = allCommits
-                .Where(c => c.DeveloperId == developerId &&
-                           c.CommittedAt >= startDate &&
-                           c.CommittedAt <= endDate)
+            var commits = (await commitRepo.FindAsync(
+                    c => c.DeveloperId == developerId &&
+                         c.CommittedAt >= startDate &&
+                         c.CommittedAt <= endDate,
+                    cancellationToken))
                 .ToList();
 
             // Get all PRs for developer in date range
-            var allPRs = await prRepo.GetAllAsync(cancellationToken);
-            var pullRequests = allPRs
-                .Where(pr => pr.AuthorId == developerId &&
-                            pr.CreatedAt >= startDate &&
-                            pr.CreatedAt <= endDate)
+            var pullRequests = (await prRepo.FindAsync(
+                    pr => pr.AuthorId == developerId &&
+                          pr.CreatedAt >= startDate &&
+                          pr.CreatedAt <= endDate,
+                    cancellationToken))
                 .ToList();
 
             _logger.LogDebug(
@@ -115,8 +115,7 @@ public class MetricsCalculationService : IMetricsCalculationService
 
             // Get all developers
             var developerRepo = _unitOfWork.Repository<Developer>();
-            var developers = await developerRepo.GetAllAsync(cancellationToken);
-            var developerList = developers.ToList();
+            var developerList = (await developerRepo.GetAllAsync(cancellationToken)).ToList();
 
             _logger.LogInformation("Found {Count} developers to process", developerList.Count);
 
@@ -169,12 +168,13 @@ public class MetricsCalculationService : IMetricsCalculationService
         CancellationToken cancellationToken)
     {
         var metricRepo = _unitOfWork.Repository<Metric>();
-        var allMetrics = await metricRepo.GetAllAsync(cancellationToken);
 
         // Check if metric exists for this developer and type
-        var existingMetric = allMetrics.FirstOrDefault(m =>
-            m.DeveloperId == developerId &&
-            m.Type == metricType);
+        var existingMetric = (await metricRepo.FindAsync(
+                m => m.DeveloperId == developerId &&
+                     m.Type == metricType,
+                cancellationToken))
+            .FirstOrDefault();
 
         if (existingMetric != null)
         {

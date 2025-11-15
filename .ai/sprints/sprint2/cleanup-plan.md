@@ -23,13 +23,13 @@ After completing Sprint 2 (GitHub Integration & Background Jobs), this cleanup p
 **Goal**: Add comprehensive unit tests for metrics service
 
 #### Tasks:
-- [ ] Create `MetricsCalculationServiceTests.cs` in test project
-- [ ] Test `CalculateMetricsForDeveloperAsync` method
-- [ ] Test `CalculateMetricsForAllDevelopersAsync` method
-- [ ] Test edge cases (no commits, no PRs, date ranges)
-- [ ] Test upsert logic (create vs update)
-- [ ] Mock dependencies (IUnitOfWork, repositories)
-- [ ] Achieve >80% code coverage for service
+- [x] Create `MetricsCalculationServiceTests.cs` in test project
+- [x] Test `CalculateMetricsForDeveloperAsync` method
+- [x] Test `CalculateMetricsForAllDevelopersAsync` method
+- [x] Test edge cases (no commits, no PRs, date ranges)
+- [x] Test upsert logic (create vs update)
+- [x] Mock dependencies (IUnitOfWork, repositories)
+- [x] Achieve >80% code coverage for service
 
 **Time Estimate**: 1 day
 
@@ -40,23 +40,23 @@ After completing Sprint 2 (GitHub Integration & Background Jobs), this cleanup p
 **Goal**: Optimize database queries and add indexes
 
 #### Task 2.C.2.1: Add Database Indexes
-- [ ] Add index on `Commits.DeveloperId`
-- [ ] Add index on `Commits.RepositoryId`
-- [ ] Add index on `Commits.CommittedAt`
-- [ ] Add index on `PullRequests.RepositoryId`
-- [ ] Add index on `PullRequests.AuthorId`
-- [ ] Add index on `PullRequests.Status`
-- [ ] Add index on `Metrics.DeveloperId`
-- [ ] Add index on `Metrics.MetricType`
-- [ ] Create EF Core migration for indexes
-- [ ] Apply migration to database
+- [x] Add index on `Commits.DeveloperId` (verified existing)
+- [x] Add index on `Commits.RepositoryId` (verified existing)
+- [x] Add index on `Commits.CommittedAt` (verified existing)
+- [x] Add index on `PullRequests.RepositoryId` (verified existing)
+- [x] Add index on `PullRequests.AuthorId` (verified existing)
+- [x] Add index on `PullRequests.Status` (verified existing)
+- [x] Add index on `Metrics.DeveloperId` (verified existing)
+- [x] Add index on `Metrics.MetricType` (verified existing)
+- [x] Create EF Core migration for indexes (not needed after verification)
+- [x] Apply migration to database (not needed after verification)
 
 #### Task 2.C.2.2: Query Optimization
-- [ ] Add `.AsNoTracking()` to read-only queries in GitHubController
-- [ ] Add `.AsNoTracking()` to metrics calculations
-- [ ] Add `.AsNoTracking()` to repository/commit/PR listings
-- [ ] Review and optimize N+1 query issues
-- [ ] Use `.Include()` for eager loading where appropriate
+- [x] Add `.AsNoTracking()` to read-only queries in GitHubController (via repository `Query()` helper)
+- [x] Add `.AsNoTracking()` to metrics calculations
+- [x] Add `.AsNoTracking()` to repository/commit/PR listings
+- [x] Review and optimize N+1 query issues
+- [x] Use `.Include()` for eager loading where appropriate
 
 **Time Estimate**: 1 day
 

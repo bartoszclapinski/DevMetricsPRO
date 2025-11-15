@@ -1,11 +1,12 @@
 using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Enums;
 using DevMetricsPro.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using DevMetricsPro.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace DevMetricsPro.Web.Controllers;
 
@@ -381,23 +382,22 @@ public class GitHubController : ControllerBase
             
             // Fetch recent commits from database
             var commitRepo = _unitOfWork.Repository<Commit>();
-            var commits = await commitRepo.GetAllAsync(cancellationToken);
-
-            // Get most recent commits ordered byt date
-            var recentCommits = commits
+            var recentCommits = await commitRepo.Query()
+                .Include(c => c.Developer)
+                .Include(c => c.Repository)
                 .OrderByDescending(c => c.CommittedAt)
                 .Take(limit)
                 .Select(c => new
                 {
                     sha = c.Sha,
                     message = c.Message,
-                    authorName = c.Developer?.DisplayName ?? "Unknown Author Name",
+                    authorName = c.Developer != null ? c.Developer.DisplayName : "Unknown Author Name",
                     committedAt = c.CommittedAt,
-                    repositoryName = c.Repository?.Name ?? "Unknown Repository Name",
+                    repositoryName = c.Repository != null ? c.Repository.Name : "Unknown Repository Name",
                     linesAdded = c.LinesAdded,
                     linesRemoved = c.LinesRemoved
                 })
-                .ToList();
+                .ToListAsync(cancellationToken);
             
             // Get total commit count
             var totalCommits = commits.Count();

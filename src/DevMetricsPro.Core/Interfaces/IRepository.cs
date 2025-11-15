@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace DevMetricsPro.Core.Interfaces;
@@ -42,5 +43,10 @@ public interface IRepository<T> where T : class
     /// Count entities matching a optional predicate
     /// </summary>
     Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken cancellationToken = default); 
+
+    /// <summary>
+    /// Returns an IQueryable for composing read-only queries
+    /// </summary>
+    IQueryable<T> Query();
 
 }
