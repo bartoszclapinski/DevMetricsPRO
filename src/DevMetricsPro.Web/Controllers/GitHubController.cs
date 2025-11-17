@@ -2,6 +2,7 @@ using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
+using DevMetricsPro.Core.Exceptions;
 using DevMetricsPro.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -116,15 +117,16 @@ public class GitHubController : ControllerBase
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Callback(
-        [FromQuery] string code,
-        [FromQuery] string state,
+        [FromQuery] GitHubCallbackRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(state) || string.IsNullOrEmpty(code))
+        if (!ModelState.IsValid)
         {
-            _logger.LogWarning("GitHub callback received with missing parameters");
-            return Redirect("/?error=invalid-request");
+            throw new ValidationException("Invalid GitHub callback payload");
         }
+
+        var code = request.Code!;
+        var state = request.State!;
 
         try
         {
@@ -205,62 +207,45 @@ public class GitHubController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SyncRepositories(CancellationToken cancellationToken)
     {
-        try
+        _logger.LogInformation("Starting repository sync for user");
+
+        // Get currently logged-in user
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            _logger.LogInformation("Starting repository sync for user");
+            _logger.LogWarning("Sync repositories called without authenticated user");
+            throw new UnauthorizedAccessException("User not authenticated");
+        }
 
-            // Get currently logged-in user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogWarning("Sync repositories called without authenticated user");
-                return Unauthorized(new { error = "User not authenticated" });
-            }
+        // Get user from database with GitHub token
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new NotFoundException($"User {userId} not found");
 
-            // Get user from database with GitHub token
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                _logger.LogError("User {UserId} not found in database", userId);
-                return NotFound(new { error = "User not found" });
-            }
+        // Check if GitHub is connected
+        if (string.IsNullOrEmpty(user.GitHubAccessToken))
+        {
+            _logger.LogWarning("User {UserId} attempted to sync without connected GitHub account", userId);
+            throw new BusinessRuleException("GitHub account not connected. Please connect your GitHub account first.");
+        }
 
-            // Check if GitHub is connected
-            if (string.IsNullOrEmpty(user.GitHubAccessToken))
-            {
-                _logger.LogWarning("User {UserId} attempted to sync without connected GitHub account", userId);
-                return BadRequest(new {error = "GitHub account not connected. Please connect your GitHub account first."});
-            }
+        // Fetch repositories from GitHub
+        _logger.LogInformation("Fetching repositories from GitHub for user {UserId}", userId);
+        var githubRepos = await _githubRepositoryService.GetUserRepositoriesAsync(
+            user.GitHubAccessToken, cancellationToken);
 
-            // Fetch repositories from GitHub
-            _logger.LogInformation("Fetching repositories from GitHub for user {UserId}", userId);
-            var githubRepos = await _githubRepositoryService.GetUserRepositoriesAsync(
-                user.GitHubAccessToken, cancellationToken);
-
-            // Save repositories to database
-            var (addedCount, updatedCount) = await SaveRepositoriesToDatabaseAsync(
-                githubRepos, user, cancellationToken);
+        // Save repositories to database
+        var (addedCount, updatedCount) = await SaveRepositoriesToDatabaseAsync(
+            githubRepos, user, cancellationToken);
             
-            _logger.LogInformation("Successfully synced {Count} repositories for user {UserId}",
-                githubRepos.Count(), userId);
+        _logger.LogInformation("Successfully synced {Count} repositories for user {UserId}",
+            githubRepos.Count(), userId);
 
-            return Ok(new
-            {
-                success = true,
-                count = githubRepos.Count(),
-                repositories = githubRepos
-            });
-        }
-        catch (UnauthorizedAccessException ex)
+        return Ok(new
         {
-            _logger.LogError(ex, "GitHub authorization failed during repository sync");
-            return Unauthorized(new {error = ex.Message});
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error syncing repositories from GitHub");
-            return StatusCode(500, new { error = "Failed to sync repositories", detail = ex.Message });
-        }
+            success = true,
+            count = githubRepos.Count(),
+            repositories = githubRepos
+        });
     }
 
     /// <summary>
@@ -274,91 +259,61 @@ public class GitHubController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SyncCommits(long githubRepositoryId, CancellationToken cancellationToken)
     {
-        try
+        _logger.LogInformation("Starting commit sync for GitHub repository {GitHubRepositoryId}", githubRepositoryId);
+
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            _logger.LogInformation("Starting commit sync for GitHub repository {GitHubRepositoryId}", githubRepositoryId);
-
-            // Get currently logged-in user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized(new {error = "User not authenticated"});
-            }
-
-            // Get user from database
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                return NotFound(new {error = "User not found"});
-            }
-
-            // Check if GitHub is connected
-            if (string.IsNullOrEmpty(user.GitHubAccessToken) || string.IsNullOrEmpty(user.GitHubUsername))
-            {
-                return BadRequest(new {error = "GitHub account not connected. Please connect your GitHub account first."});
-            }
-
-            // Get repository from database by GitHub ID (stored as ExternalId)
-            var repositoryRepo = _unitOfWork.Repository<Repository>();
-            var githubIdString = githubRepositoryId.ToString();
-            var repositories = await repositoryRepo.FindAsync(r => r.ExternalId == githubIdString, cancellationToken);
-            var repository = repositories.FirstOrDefault();
-
-            if (repository == null)
-            {
-                return NotFound(new {error = $"Repository with GitHub ID {githubRepositoryId} not found in database. Please sync repositories first."});
-            }
-            
-            var repositoryId = repository.Id; // Internal Guid for logging
-
-            // Extract repository owner and repository name
-            var owner = user.GitHubUsername;
-            var repoName = repository.Name;
-
-            _logger.LogInformation("Fetching commits from GitHub repository {Owner}/{Repo}", owner, repoName);
-            
-            // Fetch commits from GitHub (only last 100 for MVP)
-            var githubCommits = await _gitHubCommitsService.GetRepositoryCommitsAsync(
-                owner,
-                repoName,
-                user.GitHubAccessToken,
-                since: repository.LastSyncedAt, // Incremental sync
-                cancellationToken);
-
-            // Save commits to database
-            var (addedCount, updatedCount) = await SaveCommitsToDatabaseAsync(
-                githubCommits, repository, cancellationToken);
-            
-            // Update repository last synced date
-            repository.LastSyncedAt = DateTime.UtcNow;
-            await repositoryRepo.UpdateAsync(repository, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation(
-                 "Successfully synced {Total} commits for repository {RepositoryId} ({Added} new, {Updated} updated)",
-                 addedCount + updatedCount, repositoryId, addedCount, updatedCount);
-
-            return Ok(new 
-            {
-                success = true,
-                repositoryId = repositoryId,
-                repositoryName = repoName,
-                addedCount = addedCount,
-                updatedCount = updatedCount,
-                totalCommits = addedCount + updatedCount
-            });
+            throw new UnauthorizedAccessException("User not authenticated");
         }
-        catch (UnauthorizedAccessException ex)
+
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new NotFoundException("User not found");
+
+        if (string.IsNullOrEmpty(user.GitHubAccessToken) || string.IsNullOrEmpty(user.GitHubUsername))
         {
-            _logger.LogError(ex, "GitHub authorization failed during commit sync");
-            return Unauthorized(new { error = ex.Message });
+            throw new BusinessRuleException("GitHub account not connected. Please connect your GitHub account first.");
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error syncing commits for repository {GitHubRepositoryId}", githubRepositoryId);
-            return StatusCode(500, new { error = "Failed to sync commits", detail = ex.Message });
-        }   
+
+        var repositoryRepo = _unitOfWork.Repository<Repository>();
+        var githubIdString = githubRepositoryId.ToString();
+        var repository = (await repositoryRepo.FindAsync(r => r.ExternalId == githubIdString, cancellationToken))
+            .FirstOrDefault()
+            ?? throw new NotFoundException($"Repository with GitHub ID {githubRepositoryId} not found in database. Please sync repositories first.");
         
+        var repositoryId = repository.Id;
+        var owner = user.GitHubUsername;
+        var repoName = repository.Name;
+
+        _logger.LogInformation("Fetching commits from GitHub repository {Owner}/{Repo}", owner, repoName);
+
+        var githubCommits = await _gitHubCommitsService.GetRepositoryCommitsAsync(
+            owner,
+            repoName,
+            user.GitHubAccessToken,
+            since: repository.LastSyncedAt,
+            cancellationToken);
+
+        var (addedCount, updatedCount) = await SaveCommitsToDatabaseAsync(
+            githubCommits, repository, cancellationToken);
+        
+        repository.LastSyncedAt = DateTime.UtcNow;
+        await repositoryRepo.UpdateAsync(repository, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+             "Successfully synced {Total} commits for repository {RepositoryId} ({Added} new, {Updated} updated)",
+             addedCount + updatedCount, repositoryId, addedCount, updatedCount);
+
+        return Ok(new 
+        {
+            success = true,
+            repositoryId = repositoryId,
+            repositoryName = repoName,
+            addedCount = addedCount,
+            updatedCount = updatedCount,
+            totalCommits = addedCount + updatedCount
+        });
     }
 
     /// <summary>
@@ -400,7 +355,7 @@ public class GitHubController : ControllerBase
                 .ToListAsync(cancellationToken);
             
             // Get total commit count
-            var totalCommits = commits.Count();
+            var totalCommits = recentCommits.Count();
 
             return Ok(new
             {
@@ -629,94 +584,67 @@ public class GitHubController : ControllerBase
         Guid repositoryId,
         CancellationToken cancellationToken = default)
     {
-        try
+        _logger.LogInformation("Starting PR sync for repository {RepositoryId}", repositoryId);
+
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            _logger.LogInformation("Starting PR sync for repository {RepositoryId}", repositoryId);
-
-            // Get authenticated user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogWarning("User ID not found in JWT claims");
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
-            // Get user with GitHub connection
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                _logger.LogWarning("User {UserId} not found", userId);
-                return BadRequest(new { message = "User not found" });
-            }
-
-            if (string.IsNullOrEmpty(user.GitHubAccessToken))
-            {
-                _logger.LogWarning("User {UserId} does not have GitHub connected", userId);
-                return BadRequest(new { message = "GitHub account not connected" });
-            }
-
-            // Get repository
-            var repoRepository = _unitOfWork.Repository<Core.Entities.Repository>();
-            var repositories = await repoRepository.GetAllAsync(cancellationToken);
-            var repository = repositories.FirstOrDefault(r => r.Id == repositoryId);
-
-            if (repository == null)
-            {
-                _logger.LogWarning("Repository {RepositoryId} not found", repositoryId);
-                return NotFound(new { message = "Repository not found" });
-            }
-
-            // Parse owner/repo from FullName
-            var parts = repository.FullName?.Split('/');
-            if (parts == null || parts.Length != 2)
-            {
-                _logger.LogWarning("Invalid repository FullName format: {FullName}", repository.FullName);
-                return BadRequest(new { message = "Invalid repository format" });
-            }
-
-            var owner = parts[0];
-            var repoName = parts[1];
-
-            // Fetch PRs from GitHub (incremental sync using LastSyncedAt)
-            var pullRequests = await _gitHubPullRequestService.GetRepositoryPullRequestsAsync(
-                owner,
-                repoName,
-                user.GitHubAccessToken,
-                repository.LastSyncedAt,
-                cancellationToken);
-
-            var prList = pullRequests.ToList();
-            _logger.LogInformation("Fetched {Count} pull requests from GitHub", prList.Count);
-
-            // Save PRs to database
-            var (addedCount, updatedCount) = await SavePullRequestsToDatabaseAsync(
-                prList,
-                repository.Id,
-                cancellationToken);
-
-            // Update LastSyncedAt
-            repository.LastSyncedAt = DateTime.UtcNow;
-            await repoRepository.UpdateAsync(repository, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation(
-                "PR sync complete for repository {RepositoryId}: {Added} added, {Updated} updated",
-                repositoryId, addedCount, updatedCount);
-
-            return Ok(new
-            {
-                success = true,
-                message = "Pull requests synced successfully",
-                added = addedCount,
-                updated = updatedCount,
-                total = addedCount + updatedCount
-            });
+            throw new UnauthorizedAccessException("User not authenticated");
         }
-        catch (Exception ex)
+
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new NotFoundException("User not found");
+
+        if (string.IsNullOrEmpty(user.GitHubAccessToken))
         {
-            _logger.LogError(ex, "Error syncing pull requests for repository {RepositoryId}", repositoryId);
-            return StatusCode(500, new { message = "Failed to sync pull requests" });
+            throw new BusinessRuleException("GitHub account not connected");
         }
+
+        var repoRepository = _unitOfWork.Repository<Core.Entities.Repository>();
+        var repository = (await repoRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(r => r.Id == repositoryId)
+            ?? throw new NotFoundException("Repository not found");
+
+        var parts = repository.FullName?.Split('/');
+        if (parts == null || parts.Length != 2)
+        {
+            throw new BusinessRuleException("Invalid repository format");
+        }
+
+        var owner = parts[0];
+        var repoName = parts[1];
+
+        var pullRequests = await _gitHubPullRequestService.GetRepositoryPullRequestsAsync(
+            owner,
+            repoName,
+            user.GitHubAccessToken,
+            repository.LastSyncedAt,
+            cancellationToken);
+
+        var prList = pullRequests.ToList();
+        _logger.LogInformation("Fetched {Count} pull requests from GitHub", prList.Count);
+
+        var (addedCount, updatedCount) = await SavePullRequestsToDatabaseAsync(
+            prList,
+            repository.Id,
+            cancellationToken);
+
+        repository.LastSyncedAt = DateTime.UtcNow;
+        await repoRepository.UpdateAsync(repository, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "PR sync complete for repository {RepositoryId}: {Added} added, {Updated} updated",
+            repositoryId, addedCount, updatedCount);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Pull requests synced successfully",
+            added = addedCount,
+            updated = updatedCount,
+            total = addedCount + updatedCount
+        });
     }
 
     /// <summary>
@@ -845,49 +773,33 @@ public class GitHubController : ControllerBase
     public async Task<IActionResult> TriggerFullSync(
         CancellationToken cancellationToken = default)
     {
-        try
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            // Get authenticated user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogWarning("User ID not found in JWT claims");
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                _logger.LogWarning("User {UserId} not found", userId);
-                return BadRequest(new { message = "User not found" });
-            }
-
-            if (string.IsNullOrEmpty(user.GitHubAccessToken))
-            {
-                _logger.LogWarning("User {UserId} does not have GitHub connected", userId);
-                return BadRequest(new { message = "GitHub account not connected" });
-            }
-
-            // Enqueue background job
-            var jobId = Hangfire.BackgroundJob.Enqueue<Web.Jobs.SyncGitHubDataJob>(
-                job => job.ExecuteAsync(user.Id));
-
-            _logger.LogInformation(
-                "Enqueued full GitHub sync job {JobId} for user {UserId}",
-                jobId, userId);
-
-            return Ok(new
-            {
-                success = true,
-                message = "GitHub sync job started",
-                jobId = jobId
-            });
+            throw new UnauthorizedAccessException("User not authenticated");
         }
-        catch (Exception ex)
+
+        var user = await _userManager.FindByIdAsync(userId)
+            ?? throw new NotFoundException("User not found");
+
+        if (string.IsNullOrEmpty(user.GitHubAccessToken))
         {
-            _logger.LogError(ex, "Error triggering full GitHub sync");
-            return StatusCode(500, new { message = "Failed to start sync job" });
+            throw new BusinessRuleException("GitHub account not connected");
         }
+
+        var jobId = Hangfire.BackgroundJob.Enqueue<Web.Jobs.SyncGitHubDataJob>(
+            job => job.ExecuteAsync(user.Id));
+
+        _logger.LogInformation(
+            "Enqueued full GitHub sync job {JobId} for user {UserId}",
+            jobId, userId);
+
+        return Ok(new
+        {
+            success = true,
+            message = "GitHub sync job started",
+            jobId = jobId
+        });
     }
 
     /// <summary>
@@ -902,81 +814,67 @@ public class GitHubController : ControllerBase
         [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        try
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
         {
-            // Get authenticated user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            throw new UnauthorizedAccessException("User not authenticated");
+        }
+
+        var prRepository = _unitOfWork.Repository<PullRequest>();
+        var pullRequests = await prRepository.GetAllAsync(cancellationToken);
+
+        if (repositoryId.HasValue)
+        {
+            pullRequests = pullRequests.Where(pr => pr.RepositoryId == repositoryId.Value);
+        }
+
+        if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+        {
+            var prStatus = status.ToLower() switch
             {
-                return Unauthorized(new { error = "User not authenticated" });
-            }
+                "open" => PullRequestStatus.Open,
+                "closed" => PullRequestStatus.Closed,
+                "merged" => PullRequestStatus.Merged,                    
+                _ => (PullRequestStatus?)null
+            };
 
-            // Fetch pull requests from database
-            var prRepository = _unitOfWork.Repository<PullRequest>();
-            var pullRequests = await prRepository.GetAllAsync(cancellationToken);
-
-            // Filter by repository if provided
-            if (repositoryId.HasValue)
+            if (prStatus.HasValue)
             {
-                pullRequests = pullRequests.Where(pr => pr.RepositoryId == repositoryId.Value);
+                pullRequests = pullRequests.Where(pr => pr.Status == prStatus.Value);
             }
+        }
 
-            // Filter by status if provided
-            if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+        var sortedPRs = pullRequests
+            .OrderByDescending(pr => pr.UpdatedAt)
+            .Select(pr => new
             {
-                var prStatus = status.ToLower() switch
-                {
-                    "open" => PullRequestStatus.Open,
-                    "closed" => PullRequestStatus.Closed,
-                    "merged" => PullRequestStatus.Merged,                    
-                    _ => (PullRequestStatus?)null
-                };
-
-                if (prStatus.HasValue)
-                {
-                    pullRequests = pullRequests.Where(pr => pr.Status == prStatus.Value);
-                }
-            }
-
-            // Order by most recent first
-            var sortedPRs = pullRequests
-                .OrderByDescending(pr => pr.UpdatedAt)
-                .Select(pr => new
-                {
-                    id = pr.Id,
-                    externalId = pr.ExternalId,
-                    title = pr.Title,
-                    description = pr.Description,
-                    status = pr.Status.ToString(),
-                    isMerged = pr.Status == PullRequestStatus.Merged,
-                    authorName = pr.Author?.DisplayName ?? "Unknown",
-                    authorUsername = pr.Author?.GitHubUsername ?? "Unknown",
-                    repositoryName = pr.Repository?.Name ?? "Unknown",
-                    repositoryId = pr.RepositoryId,
-                    createdAt = pr.CreatedAt,
-                    updatedAt = pr.UpdatedAt,
-                    closedAt = pr.ClosedAt,
-                    mergedAt = pr.MergedAt,
-                    // GitHub URL format https://github.com/{owner}/{repository}/pull/{externalId}
-                    url = pr.Repository?.FullName != null ? 
+                id = pr.Id,
+                externalId = pr.ExternalId,
+                title = pr.Title,
+                description = pr.Description,
+                status = pr.Status.ToString(),
+                isMerged = pr.Status == PullRequestStatus.Merged,
+                authorName = pr.Author?.DisplayName ?? "Unknown",
+                authorUsername = pr.Author?.GitHubUsername ?? "Unknown",
+                repositoryName = pr.Repository?.Name ?? "Unknown",
+                repositoryId = pr.RepositoryId,
+                createdAt = pr.CreatedAt,
+                updatedAt = pr.UpdatedAt,
+                closedAt = pr.ClosedAt,
+                mergedAt = pr.MergedAt,
+                url = pr.Repository?.FullName != null ? 
                     $"https://github.com/{pr.Repository?.FullName}/pull/{pr.ExternalId}" : null
-                })
-                .ToList();
+            })
+            .ToList();
 
-                _logger.LogInformation("Fetched {Count} pull requests from database", sortedPRs.Count);
+        _logger.LogInformation("Fetched {Count} pull requests from database", sortedPRs.Count);
 
-                return Ok(new
-                {
-                    success = true,
-                    count = sortedPRs.Count,
-                    pullRequests = sortedPRs
-                });
-        }
-        catch (Exception ex)
+        return Ok(new
         {
-            _logger.LogError(ex, "Error fetching pull requests from database");
-            return StatusCode(500, new { message = "Failed to fetch pull requests from database" , detail = ex.Message });
-        }
+            success = true,
+            count = sortedPRs.Count,
+            pullRequests = sortedPRs
+        });
     }
     
 }

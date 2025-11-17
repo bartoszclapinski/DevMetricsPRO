@@ -16,19 +16,48 @@ using System.Text;
 using DevMetricsPro.Web.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
+using FluentValidation.AspNetCore;
+using FluentValidation;
+using DevMetricsPro.Application.Validators;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.ApplicationInsights.Extensibility;
+using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
     .WriteTo.Console()
-    .WriteTo.File("logs/devmetrics-log.txt", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+    .CreateBootstrapLogger();
     
 try 
 {
-    Log.Information("Starting DevMetrics Pro application");
-
     var builder = WebApplication.CreateBuilder(args);
-    builder.Host.UseSerilog();
+
+    var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+    if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+    {
+        builder.Services.AddApplicationInsightsTelemetry(options =>
+        {
+            options.ConnectionString = appInsightsConnectionString;
+        });
+    }
+
+    builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+    {
+        loggerConfiguration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .WriteTo.Console()
+            .WriteTo.File("logs/devmetrics-log.txt", rollingInterval: RollingInterval.Day);
+
+        var telemetryConfiguration = services.GetService<TelemetryConfiguration>();
+        if (!string.IsNullOrWhiteSpace(context.Configuration["ApplicationInsights:ConnectionString"]) &&
+            telemetryConfiguration is not null)
+        {
+            loggerConfiguration.WriteTo.ApplicationInsights(
+                telemetryConfiguration,
+                TelemetryConverter.Traces);
+        }
+    });
 
     // Exception handling
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -54,6 +83,7 @@ try
     // Repository Pattern - Scoped lifetime for per-request instances
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+    
     // Authentication state service
     builder.Services.AddScoped<AuthStateService>();
 
@@ -78,6 +108,11 @@ try
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
+
+    // Fluent Validation
+    builder.Services
+       .AddFluentValidationAutoValidation()
+       .AddValidatorsFromAssemblyContaining<GitHubCallbackRequestValidator>();
 
     // GitHub OAuth Service
     builder.Services.AddHttpClient(); // Required for HttpClientFactory
@@ -105,7 +140,11 @@ try
     builder.Services.AddMudServices();
 
     // API Controllers
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .ConfigureApiBehaviorOptions(options =>
+        {
+            options.SuppressModelStateInvalidFilter = true;
+        });
 
     // HttpClient for calling our own API from Blazor components
     builder.Services.AddScoped(sp => new HttpClient 
@@ -169,6 +208,8 @@ try
 
     app.UseHttpsRedirection();
 
+    app.UseSerilogRequestLogging();
+
     // Authentication and authorization
     app.UseAuthentication();
     app.UseAuthorization();
@@ -193,6 +234,7 @@ try
 
     app.MapControllers();
 
+    Log.Information("Starting DevMetrics Pro application");
     app.Run();
 
     // Local function to configure recurring jobs

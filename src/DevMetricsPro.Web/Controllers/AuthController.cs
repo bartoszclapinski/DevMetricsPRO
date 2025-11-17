@@ -1,8 +1,10 @@
 using DevMetricsPro.Application.DTOs.Auth;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
+using DevMetricsPro.Core.Exceptions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 
 namespace DevMetricsPro.Web.Controllers;
 
@@ -44,8 +46,7 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
     {
-        // Check if the model is valid
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        EnsureModelStateIsValid();
 
         // Create a new user
         var user = new ApplicationUser
@@ -60,8 +61,8 @@ public class AuthController : ControllerBase
 
         if (!result.Succeeded)
         {
-            foreach (var error in result.Errors) ModelState.AddModelError(string.Empty, error.Description);
-            return BadRequest(ModelState);
+            var identityErrors = string.Join(" | ", result.Errors.Select(e => e.Description));
+            throw new ValidationException(identityErrors);
         }
 
         // TODO: Add default role after implementing role seeding
@@ -96,12 +97,15 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
     {
-        // Check if the model is valid
-        if (!ModelState.IsValid) return BadRequest(ModelState);
+        EnsureModelStateIsValid();
 
         // Find model by email
         var user = await _userManager.FindByEmailAsync(request.Email);
-        if (user == null) return Unauthorized("Invalid e-mail or password");
+        if (user == null)
+        {
+            _logger.LogWarning("Invalid login attempt for {Email}", request.Email);
+            throw new UnauthorizedAccessException("Invalid e-mail or password");
+        }
 
         // Check password
         var result = await _signInManager.CheckPasswordSignInAsync(
@@ -115,9 +119,9 @@ public class AuthController : ControllerBase
             if (result.IsLockedOut)
             {
                 _logger.LogWarning("User {Email} has been locked out", user.Email);
-                return Unauthorized(new { message = "Account locked due to multiple failed attempts"});
+                throw new BusinessRuleException("Account locked due to multiple failed attempts");
             }
-            return Unauthorized(new { message = "Invalid e-mail or password"});
+            throw new UnauthorizedAccessException("Invalid e-mail or password");
         }
 
         // Update last login time
@@ -143,5 +147,25 @@ public class AuthController : ControllerBase
         });
     }
 
+    private void EnsureModelStateIsValid()
+    {
+        if (ModelState.IsValid)
+        {
+            return;
+        }
 
+        var errors = ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) 
+                ? e.Exception?.Message 
+                : e.ErrorMessage)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .ToList();
+
+        var message = errors.Any()
+            ? string.Join(" | ", errors)
+            : "Invalid request payload";
+
+        throw new ValidationException(message);
+    }
 }

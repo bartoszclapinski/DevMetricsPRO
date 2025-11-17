@@ -1,7 +1,10 @@
+using System.Net.Http;
 using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Infrastructure.Resilience;
 using Microsoft.Extensions.Logging;
 using Octokit;
+using Polly.Retry;
 
 namespace DevMetricsPro.Infrastructure.Services;
 
@@ -11,10 +14,12 @@ namespace DevMetricsPro.Infrastructure.Services;
 public class GitHubRepositoryService : IGitHubRepositoryService
 {
     private readonly ILogger<GitHubRepositoryService> _logger;
+    private readonly AsyncRetryPolicy _retryPolicy;
 
     public GitHubRepositoryService(ILogger<GitHubRepositoryService> logger)
     {
         _logger = logger;
+        _retryPolicy = GitHubResiliencePolicies.CreateRetryPolicy(logger, nameof(GitHubRepositoryService));
     }
 
     /// <summary>
@@ -25,37 +30,36 @@ public class GitHubRepositoryService : IGitHubRepositoryService
     {
         try
         {
-            _logger.LogInformation("Fetching repositories from GitHub API");
-            
-            // Create GitHub client with OAuth token
-            var client = new GitHubClient(new ProductHeaderValue("DevMetricsPro"))
+            return await _retryPolicy.ExecuteAsync(async ct =>
             {
-                Credentials = new Credentials(accessToken)
-            };
+                ct.ThrowIfCancellationRequested();
 
-            // Fetch all repositories for the authenticated user
-            var repositories = await client.Repository.GetAllForCurrent();
+                _logger.LogInformation("Fetching repositories from GitHub API");
 
-            _logger.LogInformation("Successfully fetched {Count} repositories from GitHub", repositories.Count);
+                var client = CreateClient(accessToken);
 
-            // Map Octokit Repository objects to our DTO
-            return repositories.Select(repo => new GitHubRepositoryDto
-            {
-                Id = repo.Id,
-                Name = repo.Name,
-                Description = repo.Description,
-                HtmlUrl = repo.HtmlUrl,
-                FullName = repo.FullName,
-                IsPrivate = repo.Private,
-                IsFork = repo.Fork,
-                StargazersCount = repo.StargazersCount,
-                ForksCount = repo.ForksCount,
-                OpenIssuesCount = repo.OpenIssuesCount,
-                Language = repo.Language,
-                CreatedAt = repo.CreatedAt.UtcDateTime,
-                UpdatedAt = repo.UpdatedAt.UtcDateTime,
-                PushedAt = repo.PushedAt?.UtcDateTime
-            });
+                var repositories = await client.Repository.GetAllForCurrent();
+
+                _logger.LogInformation("Successfully fetched {Count} repositories from GitHub", repositories.Count);
+
+                return repositories.Select(repo => new GitHubRepositoryDto
+                {
+                    Id = repo.Id,
+                    Name = repo.Name,
+                    Description = repo.Description,
+                    HtmlUrl = repo.HtmlUrl,
+                    FullName = repo.FullName,
+                    IsPrivate = repo.Private,
+                    IsFork = repo.Fork,
+                    StargazersCount = repo.StargazersCount,
+                    ForksCount = repo.ForksCount,
+                    OpenIssuesCount = repo.OpenIssuesCount,
+                    Language = repo.Language,
+                    CreatedAt = repo.CreatedAt.UtcDateTime,
+                    UpdatedAt = repo.UpdatedAt.UtcDateTime,
+                    PushedAt = repo.PushedAt?.UtcDateTime
+                });
+            }, cancellationToken);
         }
         catch (AuthorizationException ex)
         {
@@ -64,13 +68,34 @@ public class GitHubRepositoryService : IGitHubRepositoryService
         }
         catch (RateLimitExceededException ex)
         {
-            _logger.LogError(ex, "GitHub API rate limit exceeded.");
-            throw new InvalidOperationException("GitHub API rate limit exceeded. Please try again later.", ex);
+            _logger.LogWarning(ex, "GitHub API rate limit exceeded.");
+            throw GitHubExceptionHelper.CreateRateLimitException(ex);
+        }
+        catch (ApiException ex)
+        {
+            _logger.LogError(ex, "GitHub API error while fetching repositories.");
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "GitHub is currently unavailable. Please try again shortly.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Network error while fetching repositories from GitHub.");
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unable to reach GitHub. Check your connection and try again.",
+                ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching repositories from GitHub");
-            throw;
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unexpected error while contacting GitHub.", ex);
         }
     }
+
+    private static GitHubClient CreateClient(string accessToken) =>
+        new(new ProductHeaderValue("DevMetricsPro"))
+        {
+            Credentials = new Credentials(accessToken)
+        };
 }
