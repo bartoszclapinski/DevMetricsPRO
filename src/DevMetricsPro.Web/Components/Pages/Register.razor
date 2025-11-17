@@ -264,8 +264,8 @@
             }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _errorMessage = "Registration failed. Please check your information and try again.";
+                _errorMessage = await response.ReadProblemDetailsMessageAsync()
+                    ?? "Registration failed. Please check your information and try again.";
             }
         }
         catch (Exception ex)

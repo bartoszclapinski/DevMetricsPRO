@@ -67,14 +67,14 @@ After completing Sprint 2 (GitHub Integration & Background Jobs), this cleanup p
 **Goal**: Improve error handling with user-friendly messages
 
 #### Tasks:
-- [ ] Create custom exception types (NotFoundException, ValidationException, etc.)
-- [ ] Add global exception handler middleware
-- [ ] Return user-friendly error messages from API endpoints
-- [ ] Add validation to DTOs (FluentValidation)
-- [ ] Handle GitHub API rate limit errors gracefully
-- [ ] Add retry logic for transient failures (Polly)
-- [ ] Display error messages in Blazor components
-- [ ] Add error logging to Application Insights/Serilog
+- [x] Create custom exception types (NotFoundException, ValidationException, etc.)
+- [x] Add global exception handler middleware
+- [x] Return user-friendly error messages from API endpoints
+- [x] Add validation to DTOs (FluentValidation)
+- [x] Handle GitHub API rate limit errors gracefully
+- [x] Add retry logic for transient failures (Polly)
+- [x] Display error messages in Blazor components
+- [x] Add error logging to Application Insights/Serilog
 
 **Time Estimate**: 1 day
 

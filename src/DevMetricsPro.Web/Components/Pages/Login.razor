@@ -240,7 +240,8 @@
             }
             else
             {
-                _errorMessage = "Invalid email or password. Please try again.";
+                _errorMessage = await response.ReadProblemDetailsMessageAsync()
+                    ?? "Invalid email or password. Please try again.";
             }
         }
         catch (Exception ex)

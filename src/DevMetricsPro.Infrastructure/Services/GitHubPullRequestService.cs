@@ -1,7 +1,10 @@
+using System.Net.Http;
 using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Infrastructure.Resilience;
 using Microsoft.Extensions.Logging;
 using Octokit;
+using Polly.Retry;
 
 namespace DevMetricsPro.Infrastructure.Services;
 
@@ -11,10 +14,12 @@ namespace DevMetricsPro.Infrastructure.Services;
 public class GitHubPullRequestService : IGitHubPullRequestService
 {
     private readonly ILogger<GitHubPullRequestService> _logger;
+    private readonly AsyncRetryPolicy _retryPolicy;
 
     public GitHubPullRequestService(ILogger<GitHubPullRequestService> logger)
     {
         _logger = logger;
+        _retryPolicy = GitHubResiliencePolicies.CreateRetryPolicy(logger, nameof(GitHubPullRequestService));
     }
 
     /// <summary>
@@ -29,73 +34,70 @@ public class GitHubPullRequestService : IGitHubPullRequestService
     {
         try
         {
-            _logger.LogInformation(
-                "Fetching pull requests for {Owner}/{Repository} from GitHub API",
-                owner, repositoryName);
-
-            // Create GitHub client with OAuth token
-            var client = new GitHubClient(new ProductHeaderValue("DevMetricsPro"))
+            return await _retryPolicy.ExecuteAsync(async ct =>
             {
-                Credentials = new Credentials(accessToken)
-            };
+                ct.ThrowIfCancellationRequested();
 
-            // Create PR request with filters
-            var request = new PullRequestRequest
-            {
-                State = ItemStateFilter.All, // Fetch both open and closed PRs
-                SortProperty = PullRequestSort.Updated,
-                SortDirection = SortDirection.Descending
-            };
-
-            // Fetch all pull requests
-            var pullRequests = await client.PullRequest.GetAllForRepository(owner, repositoryName, request);
-
-            _logger.LogInformation(
-                "Successfully fetched {Count} pull requests for {Owner}/{Repository}",
-                pullRequests.Count, owner, repositoryName);
-
-            // Filter by date if 'since' is provided (for incremental sync)
-            var filteredPRs = since.HasValue
-                ? pullRequests.Where(pr => pr.UpdatedAt >= since.Value)
-                : pullRequests;
-
-            // Map Octokit PullRequest objects to our DTO
-            var result = filteredPRs.Select(pr => new GitHubPullRequestDto
-            {
-                Number = pr.Number,
-                Title = pr.Title,
-                State = pr.State.StringValue,
-                Body = pr.Body,
-                HtmlUrl = pr.HtmlUrl,
-                AuthorLogin = pr.User.Login,
-                AuthorName = pr.User.Name,
-                CreatedAt = pr.CreatedAt.UtcDateTime,
-                UpdatedAt = pr.UpdatedAt.UtcDateTime,
-                ClosedAt = pr.ClosedAt?.UtcDateTime,
-                MergedAt = pr.MergedAt?.UtcDateTime,
-                IsMerged = pr.Merged,
-                IsDraft = pr.Draft,
-                Additions = pr.Additions,
-                Deletions = pr.Deletions,
-                ChangedFiles = pr.ChangedFiles,
-                RepositoryName = repositoryName
-            }).ToList();
-
-            if (since.HasValue)
-            {
                 _logger.LogInformation(
-                    "Filtered to {Count} pull requests updated since {Since}",
-                    result.Count, since.Value);
-            }
+                    "Fetching pull requests for {Owner}/{Repository} from GitHub API",
+                    owner, repositoryName);
 
-            return result;
+                var client = CreateClient(accessToken);
+
+                var request = new PullRequestRequest
+                {
+                    State = ItemStateFilter.All,
+                    SortProperty = PullRequestSort.Updated,
+                    SortDirection = SortDirection.Descending
+                };
+
+                var pullRequests = await client.PullRequest.GetAllForRepository(owner, repositoryName, request);
+
+                _logger.LogInformation(
+                    "Successfully fetched {Count} pull requests for {Owner}/{Repository}",
+                    pullRequests.Count, owner, repositoryName);
+
+                var filteredPRs = since.HasValue
+                    ? pullRequests.Where(pr => pr.UpdatedAt >= since.Value)
+                    : pullRequests;
+
+                var result = filteredPRs.Select(pr => new GitHubPullRequestDto
+                {
+                    Number = pr.Number,
+                    Title = pr.Title,
+                    State = pr.State.StringValue,
+                    Body = pr.Body,
+                    HtmlUrl = pr.HtmlUrl,
+                    AuthorLogin = pr.User.Login,
+                    AuthorName = pr.User.Name,
+                    CreatedAt = pr.CreatedAt.UtcDateTime,
+                    UpdatedAt = pr.UpdatedAt.UtcDateTime,
+                    ClosedAt = pr.ClosedAt?.UtcDateTime,
+                    MergedAt = pr.MergedAt?.UtcDateTime,
+                    IsMerged = pr.Merged,
+                    IsDraft = pr.Draft,
+                    Additions = pr.Additions,
+                    Deletions = pr.Deletions,
+                    ChangedFiles = pr.ChangedFiles,
+                    RepositoryName = repositoryName
+                }).ToList();
+
+                if (since.HasValue)
+                {
+                    _logger.LogInformation(
+                        "Filtered to {Count} pull requests updated since {Since}",
+                        result.Count, since.Value);
+                }
+
+                return result;
+            }, cancellationToken);
         }
-        catch (NotFoundException ex)
+        catch (Octokit.NotFoundException ex)
         {
             _logger.LogError(ex,
                 "Repository {Owner}/{Repository} not found on GitHub",
                 owner, repositoryName);
-            throw new InvalidOperationException(
+            throw new DevMetricsPro.Core.Exceptions.NotFoundException(
                 $"Repository {owner}/{repositoryName} not found.", ex);
         }
         catch (AuthorizationException ex)
@@ -108,17 +110,41 @@ public class GitHubPullRequestService : IGitHubPullRequestService
         }
         catch (RateLimitExceededException ex)
         {
-            _logger.LogError(ex, "GitHub API rate limit exceeded");
-            throw new InvalidOperationException(
-                "GitHub API rate limit exceeded. Please try again later.", ex);
+            _logger.LogWarning(ex, "GitHub API rate limit exceeded while fetching pull requests.");
+            throw GitHubExceptionHelper.CreateRateLimitException(ex);
+        }
+        catch (ApiException ex)
+        {
+            _logger.LogError(ex,
+                "GitHub API error fetching pull requests for {Owner}/{Repository}",
+                owner, repositoryName);
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "GitHub is currently unavailable. Please try again shortly.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex,
+                "Network error fetching pull requests for {Owner}/{Repository}",
+                owner, repositoryName);
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unable to reach GitHub. Check your connection and try again.",
+                ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Error fetching pull requests for {Owner}/{Repository}",
                 owner, repositoryName);
-            throw;
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unexpected error while contacting GitHub.", ex);
         }
     }
+
+    private static GitHubClient CreateClient(string accessToken) =>
+        new(new ProductHeaderValue("DevMetricsPro"))
+        {
+            Credentials = new Credentials(accessToken)
+        };
 }
 

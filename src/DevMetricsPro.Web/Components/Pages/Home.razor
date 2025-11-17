@@ -185,10 +185,15 @@ else
                     githubUsername = status.Username;
                 }
             }
+            else
+            {
+                await NotifyApiProblemAsync(response, "Unable to check GitHub connection status.", Severity.Warning);
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error checking GitHub connection status");
+            Snackbar.Add("Unable to check GitHub connection status.", Severity.Error);
         }
     }
 
@@ -221,7 +226,7 @@ else
             }
             else
             {
-                Snackbar.Add("Failed to initiate GitHub connection", Severity.Error);
+                await NotifyApiProblemAsync(response, "Failed to initiate GitHub connection.");
             }
         }
         catch (Exception ex)
@@ -256,10 +261,15 @@ else
                     _recentCommits = result.Commits ?? new List<RecentCommitDto>();
                 }
             }
+            else
+            {
+                await NotifyApiProblemAsync(response, "Failed to load recent commits.");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading recent commits");
+            Snackbar.Add("Failed to load recent commits.", Severity.Error);
         }
     }
 
@@ -277,6 +287,12 @@ else
             return $"{(int)timeSpan.TotalDays} days ago";
         
         return dateTime.ToString("MMM dd, yyyy");
+    }
+
+    private async Task NotifyApiProblemAsync(HttpResponseMessage response, string fallbackMessage, Severity severity = Severity.Error)
+    {
+        var message = await response.ReadProblemDetailsMessageAsync();
+        Snackbar.Add(message ?? fallbackMessage, severity);
     }
 
     // Helper classes for deserializing API responses

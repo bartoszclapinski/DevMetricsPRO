@@ -1,7 +1,10 @@
+using System.Net.Http;
 using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
+using DevMetricsPro.Infrastructure.Resilience;
 using Microsoft.Extensions.Logging;
 using Octokit;
+using Polly.Retry;
 
 namespace DevMetricsPro.Infrastructure.Services;
 
@@ -11,10 +14,12 @@ namespace DevMetricsPro.Infrastructure.Services;
 public class GitHubCommitsService : IGitHubCommitsService
 {
     private readonly ILogger<GitHubCommitsService> _logger;
+    private readonly AsyncRetryPolicy _retryPolicy;
 
     public GitHubCommitsService(ILogger<GitHubCommitsService> logger)
     {
         _logger = logger;
+        _retryPolicy = GitHubResiliencePolicies.CreateRetryPolicy(logger, nameof(GitHubCommitsService));
     }
 
     /// <summary>
@@ -29,52 +34,50 @@ public class GitHubCommitsService : IGitHubCommitsService
     {
         try
         {
-            _logger.LogInformation(
-                "Fetching commits from GitHub repository {Owner}/{Repo} since {Since}",
-                owner, repositoryName, since?.ToString("yyyy-MM-dd") ?? "beginning");
-
-            // Create GitHub client with OAuth token
-            var client = new GitHubClient(new ProductHeaderValue("DevMetricsPro"))
+            return await _retryPolicy.ExecuteAsync(async ct =>
             {
-                Credentials = new Credentials(accessToken)
-            };
+                ct.ThrowIfCancellationRequested();
 
-            // Build request with optional since parameter
-            var request = new CommitRequest();
-            if (since.HasValue)
-            {
-                request.Since = new DateTimeOffset(since.Value);
-            }
+                _logger.LogInformation(
+                    "Fetching commits from GitHub repository {Owner}/{Repo} since {Since}",
+                    owner, repositoryName, since?.ToString("yyyy-MM-dd") ?? "beginning");
 
-            // Fetch commits for the repository
-            var commits = await client.Repository.Commit.GetAll(owner, repositoryName, request);
+                var client = CreateClient(accessToken);
 
-            _logger.LogInformation(
-                "Successfully fetched {Count} commits from {Owner}/{Repo}",
-                commits.Count, owner, repositoryName);
+                var request = new CommitRequest();
+                if (since.HasValue)
+                {
+                    request.Since = new DateTimeOffset(since.Value);
+                }
 
-            // Map Octokit GitHubCommit objects to our DTO
-            return commits.Select(commit => new GitHubCommitDto
-            {
-                Sha = commit.Sha,
-                Message = commit.Commit.Message,
-                AuthorName = commit.Commit.Author.Name,
-                AuthorEmail = commit.Commit.Author.Email,
-                AuthorDate = commit.Commit.Author.Date.UtcDateTime,
-                CommitterName = commit.Commit.Committer.Name,
-                CommitterEmail = commit.Commit.Committer.Email,
-                CommitterDate = commit.Commit.Committer.Date.UtcDateTime,
-                HtmlUrl = commit.HtmlUrl,
-                Additions = commit.Stats?.Additions ?? 0,
-                Deletions = commit.Stats?.Deletions ?? 0,
-                TotalChanges = commit.Stats?.Total ?? 0,
-                RepositoryName = repositoryName
-            });
+                var commits = await client.Repository.Commit.GetAll(owner, repositoryName, request);
+
+                _logger.LogInformation(
+                    "Successfully fetched {Count} commits from {Owner}/{Repo}",
+                    commits.Count, owner, repositoryName);
+
+                return commits.Select(commit => new GitHubCommitDto
+                {
+                    Sha = commit.Sha,
+                    Message = commit.Commit.Message,
+                    AuthorName = commit.Commit.Author.Name,
+                    AuthorEmail = commit.Commit.Author.Email,
+                    AuthorDate = commit.Commit.Author.Date.UtcDateTime,
+                    CommitterName = commit.Commit.Committer.Name,
+                    CommitterEmail = commit.Commit.Committer.Email,
+                    CommitterDate = commit.Commit.Committer.Date.UtcDateTime,
+                    HtmlUrl = commit.HtmlUrl,
+                    Additions = commit.Stats?.Additions ?? 0,
+                    Deletions = commit.Stats?.Deletions ?? 0,
+                    TotalChanges = commit.Stats?.Total ?? 0,
+                    RepositoryName = repositoryName
+                });
+            }, cancellationToken);
         }
-        catch (NotFoundException ex)
+        catch (Octokit.NotFoundException ex)
         {
             _logger.LogError(ex, "Repository {Owner}/{Repo} not found", owner, repositoryName);
-            throw new InvalidOperationException($"Repository {owner}/{repositoryName} not found.", ex);
+            throw new DevMetricsPro.Core.Exceptions.NotFoundException($"Repository {owner}/{repositoryName} not found.", ex);
         }
         catch (AuthorizationException ex)
         {
@@ -83,13 +86,34 @@ public class GitHubCommitsService : IGitHubCommitsService
         }
         catch (RateLimitExceededException ex)
         {
-            _logger.LogError(ex, "GitHub API rate limit exceeded");
-            throw new InvalidOperationException("GitHub API rate limit exceeded. Please try again later.", ex);
+            _logger.LogWarning(ex, "GitHub API rate limit exceeded while fetching commits.");
+            throw GitHubExceptionHelper.CreateRateLimitException(ex);
+        }
+        catch (ApiException ex)
+        {
+            _logger.LogError(ex, "GitHub API error fetching commits for {Owner}/{Repo}", owner, repositoryName);
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "GitHub is currently unavailable. Please try again shortly.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Network error fetching commits for {Owner}/{Repo}", owner, repositoryName);
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unable to reach GitHub. Check your connection and try again.",
+                ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching commits from {Owner}/{Repo}", owner, repositoryName);
-            throw;
+            throw GitHubExceptionHelper.CreateExternalServiceException(
+                "Unexpected error while contacting GitHub.", ex);
         }
     }
+
+    private static GitHubClient CreateClient(string accessToken) =>
+        new(new ProductHeaderValue("DevMetricsPro"))
+        {
+            Credentials = new Credentials(accessToken)
+        };
 }

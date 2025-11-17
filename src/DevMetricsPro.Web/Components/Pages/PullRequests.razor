@@ -229,6 +229,14 @@ else
                 var result = await response.Content.ReadFromJsonAsync<GitHubStatusResponse>();
                 _isGitHubConnected = result?.Connected ?? false;
             }
+            else
+            {
+                var message = await response.ReadProblemDetailsMessageAsync();
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    Snackbar.Add(message, Severity.Warning);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -255,6 +263,14 @@ else
                 if (result?.Success == true && result.Repositories != null)
                 {
                     _repositories = result.Repositories.OrderBy(r => r.Name).ToList();
+                }
+            }
+            else
+            {
+                var message = await response.ReadProblemDetailsMessageAsync();
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    Snackbar.Add(message, Severity.Warning);
                 }
             }
         }
@@ -294,13 +310,14 @@ else
             }
             else
             {
-                _errorMessage = $"Failed to load pull requests. Status: {response.StatusCode}";
+                _errorMessage = await ResolveProblemDetailsMessageAsync(response, "Failed to load pull requests. Please try again.");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading pull requests");
             _errorMessage = "An error occurred while loading pull requests. Please try again.";
+            Snackbar.Add(_errorMessage, Severity.Error);
         }
         finally
         {
@@ -340,8 +357,8 @@ else
             }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"Failed to sync pull requests: {errorContent}", Severity.Error);
+                var errorMessage = await ResolveProblemDetailsMessageAsync(response, "Failed to sync pull requests.");
+                Snackbar.Add(errorMessage, Severity.Error);
             }
         }
         catch (Exception ex)
@@ -448,5 +465,11 @@ else
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
+    }
+
+    private async Task<string> ResolveProblemDetailsMessageAsync(HttpResponseMessage response, string fallbackMessage)
+    {
+        var message = await response.ReadProblemDetailsMessageAsync();
+        return string.IsNullOrWhiteSpace(message) ? fallbackMessage : message;
     }
 }

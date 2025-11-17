@@ -229,6 +229,14 @@ else
                 var status = await response.Content.ReadFromJsonAsync<GitHubStatusResponse>();
                 _isGitHubConnected = status?.Connected == true;
             }
+            else
+            {
+                var message = await response.ReadProblemDetailsMessageAsync();
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    Snackbar.Add(message, Severity.Warning);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -271,14 +279,15 @@ else
             }
             else
             {
-                _errorMessage = "Failed to load repositories. Please try again.";
-                Logger.LogError("Failed to load repositories. Status: {StatusCode}", response.StatusCode);
+                _errorMessage = await ResolveProblemDetailsMessageAsync(response, "Failed to load repositories. Please try again.");
+                Logger.LogError("Failed to load repositories. Status: {StatusCode}. Detail: {Detail}", response.StatusCode, _errorMessage);
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading repositories");
             _errorMessage = "An error occurred while loading repositories.";
+            Snackbar.Add(_errorMessage, Severity.Error);
         }
         finally
         {
@@ -297,6 +306,10 @@ else
             if (string.IsNullOrEmpty(_errorMessage))
             {
                 Snackbar.Add($"Successfully synced {_repositories.Count} repositories!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(_errorMessage, Severity.Error);
             }
         }
         finally
@@ -335,9 +348,9 @@ else
             }
             else
             {
-                var errorMessage = $"Failed to sync commits for {repositoryName}";
+                var errorMessage = await ResolveProblemDetailsMessageAsync(response, $"Failed to sync commits for {repositoryName}");
                 Snackbar.Add(errorMessage, Severity.Error);
-                Logger.LogError("Failed to sync commits for repository {Name}. Status: {StatusCode}", repositoryName, response.StatusCode);
+                Logger.LogError("Failed to sync commits for repository {Name}. Status: {StatusCode}. Detail: {Detail}", repositoryName, response.StatusCode, errorMessage);
             }
         }
         catch (Exception ex)
@@ -388,5 +401,11 @@ else
         public bool Success { get; set; }
         public int AddedCount { get; set; }
         public int UpdatedCount { get; set; }
+    }
+
+    private async Task<string> ResolveProblemDetailsMessageAsync(HttpResponseMessage response, string fallbackMessage)
+    {
+        var message = await response.ReadProblemDetailsMessageAsync();
+        return string.IsNullOrWhiteSpace(message) ? fallbackMessage : message;
     }
 }

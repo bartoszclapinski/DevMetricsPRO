@@ -1276,6 +1276,67 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ---
 
+### Day 12 - November 16, 2025
+**Focus**:
+- Phase 2.C.3 task “Display error messages in Blazor components” (Issue #93)
+
+**Highlights**:
+- Created reusable `HttpResponseMessageExtensions.ReadProblemDetailsMessageAsync()` in Web layer to hydrate RFC 7807 payloads (reused across components and forms).
+- Updated `Home.razor`, `Repositories.razor`, and `PullRequests.razor` to call the helper and surface API failures via `ISnackbar` and existing alert panels, instead of silent failures or generic strings.
+- Refined `Login.razor` and `Register.razor` to show validation/business error details coming from the new global exception pipeline.
+- Added `_Imports.razor` import so every component can access the helper without extra directives.
+
+**Testing**:
+- `dotnet build` (root solution) — succeeds with 0 warnings/errors.
+
+**Notes / Next Steps**:
+- Remaining 2.C.3 items are resiliency related (Polly retry + GitHub rate-limit handling) and structured logging.
+- Once resiliency work lands we can close issue #93 and move to Phase 2.C.4 (Caching).
+
+---
+
+### Day 13 - November 17, 2025
+**Focus**:
+- Phase 2.C.3 tasks “Handle GitHub API rate limit errors gracefully” + “Add retry logic for transient failures (Polly)” (Issue #93)
+
+**Highlights**:
+- Added `Polly` dependency plus internal `GitHubResiliencePolicies` helper that gives every Octokit call a 3-attempt exponential backoff with jitter for `ApiException`, `HttpRequestException`, and `TaskCanceledException`.
+- Centralized rate-limit messaging through `GitHubExceptionHelper`, mapping Octokit’s `RateLimitExceededException` to our `ExternalServiceException` with a human-readable retry ETA.
+- Updated `GitHubRepositoryService`, `GitHubCommitsService`, and `GitHubPullRequestService` to:
+  - Execute through the shared retry policy (with cancellation support),
+  - Throw domain exceptions (`NotFoundException`, `UnauthorizedAccessException`, `ExternalServiceException`) so the global handler can respond consistently,
+  - Log transient retries vs terminal failures separately.
+- Confirmed background job + controllers automatically benefit (they already bubble exceptions), so UI now gets friendly “rate limit” snackbars without special casing.
+
+**Testing**:
+- `dotnet build`
+- `dotnet test tests/DevMetricsPro.Infrastructure.Tests/DevMetricsPro.Infrastructure.Tests.csproj`
+
+**Notes / Next Steps**:
+- Final open Phase 2.C.3 item is structured logging/Application Insights hook-up; once done we can close Issue #93 and move ahead to caching (2.C.4).
+
+---
+
+### Day 14 - November 17, 2025 (later)
+**Focus**:
+- Phase 2.C.3 task “Add error logging to Application Insights/Serilog” (Issue #93)
+
+**Highlights**:
+- Added `Microsoft.ApplicationInsights.AspNetCore` + `Serilog.Sinks.ApplicationInsights`, surfaced configuration knobs in `appsettings*.json`, and wired telemetry registration to only activate when a connection string is provided (so devs aren’t forced to provision AI locally).
+- Updated `Program.cs` to:
+  - Bootstrap Serilog early, then rebuild the pipeline via `UseSerilog` with DI/Configuration.
+  - Forward console + rolling file logs, and conditionally fan out to Application Insights using `TelemetryConverter.Traces`.
+  - Enable `UseSerilogRequestLogging()` for per-request diagnostics.
+- Confirmed solution builds cleanly with new telemetry references.
+
+**Testing**:
+- `dotnet build`
+
+**Notes / Next Steps**:
+- Phase 2.C.3 is now fully green (Issue #93 ready to close once branch is reviewed/merged). Next phase in the cleanup plan: 2.C.4 Caching Layer.
+
+---
+
 ### Sprint 2 Completion Summary
 
 ---
