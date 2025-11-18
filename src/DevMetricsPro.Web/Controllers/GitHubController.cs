@@ -1,3 +1,4 @@
+using DevMetricsPro.Application.Caching;
 using DevMetricsPro.Application.DTOs.GitHub;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
@@ -26,6 +27,8 @@ public class GitHubController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGitHubCommitsService _gitHubCommitsService;
     private readonly IGitHubPullRequestService _gitHubPullRequestService;
+    private readonly ICacheService _cacheService;
+    private static readonly int[] RecentCommitLimits = [10];
 
     public GitHubController(IGitHubOAuthService gitHubOAuthService,
         UserManager<ApplicationUser> userManager,
@@ -33,7 +36,8 @@ public class GitHubController : ControllerBase
         IGitHubRepositoryService githubRepositoryService,
         IUnitOfWork unitOfWork,
         IGitHubCommitsService gitHubCommitsService,
-        IGitHubPullRequestService gitHubPullRequestService)
+        IGitHubPullRequestService gitHubPullRequestService,
+        ICacheService cacheService)
     {
         _gitHubOAuthService = gitHubOAuthService ?? throw new ArgumentNullException(nameof(gitHubOAuthService));
         _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -42,6 +46,7 @@ public class GitHubController : ControllerBase
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _gitHubCommitsService = gitHubCommitsService ?? throw new ArgumentNullException(nameof(gitHubCommitsService));
         _gitHubPullRequestService = gitHubPullRequestService ?? throw new ArgumentNullException(nameof(gitHubPullRequestService));
+        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
     }
 
     /// <summary>
@@ -80,28 +85,36 @@ public class GitHubController : ControllerBase
     [HttpGet("status")]
     [Authorize(AuthenticationSchemes = "Bearer")]  // Use JWT Bearer auth
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetConnectionStatus()
+    public async Task<IActionResult> GetConnectionStatus(CancellationToken cancellationToken)
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!TryGetUserId(out var userId))
         {
             return Unauthorized(new { error = "User not authenticated" });
         }
 
-        var user = await _userManager.FindByIdAsync(userId);
+        var cacheKey = CacheKeys.GitHubConnectionStatus(userId);
+        var cached = await _cacheService.GetAsync<GitHubConnectionStatusResponse>(cacheKey, cancellationToken);
+        if (cached is not null)
+        {
+            return Ok(cached);
+        }
+
+        var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null)
         {
             return NotFound(new { error = "User not found" });
         }
 
-        var isConnected = !string.IsNullOrEmpty(user.GitHubUsername);
+        var response = new GitHubConnectionStatusResponse
+        {
+            Connected = !string.IsNullOrEmpty(user.GitHubUsername),
+            Username = user.GitHubUsername,
+            ConnectedAt = user.GitHubConnectedAt
+        };
 
-        return Ok(new 
-        { 
-            connected = isConnected, 
-            username = user.GitHubUsername, 
-            connectedAt = user.GitHubConnectedAt
-        });
+        await _cacheService.SetAsync(cacheKey, response, CacheDurations.GitHubConnectionStatus, cancellationToken);
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -167,6 +180,11 @@ public class GitHubController : ControllerBase
                 return Redirect("/?error=update-failed");
             }
 
+            if (Guid.TryParse(userId, out var parsedUserId))
+            {
+                await _cacheService.RemoveAsync(CacheKeys.GitHubConnectionStatus(parsedUserId), cancellationToken);
+            }
+
             _logger.LogInformation(
                 "Successfully connected GitHub account {Username} for user {UserId}",
                 oauthResponse.GitHubUsername,
@@ -196,6 +214,61 @@ public class GitHubController : ControllerBase
         return Ok(new { message = "GitHub OAuth controller is working" });
     }
 
+    private bool TryGetUserId(out Guid userId)
+    {
+        userId = Guid.Empty;
+        var userIdValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdValue, out userId);
+    }
+
+    /// <summary>
+    /// Gets repositories from the local database (cached via Redis).
+    /// </summary>
+    [HttpGet("repositories")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRepositories(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized(new { error = "User not authenticated" });
+        }
+
+        var cacheKey = CacheKeys.GitHubRepositories(userId);
+        var cached = await _cacheService.GetAsync<List<GitHubRepositoryDto>>(cacheKey, cancellationToken);
+        if (cached is not null && cached.Any())
+        {
+            return Ok(new
+            {
+                success = true,
+                repositories = cached,
+                lastSyncedAt = cached.Max(r => (DateTime?)r.UpdatedAt)
+            });
+        }
+
+        var repositoryRepo = _unitOfWork.Repository<Repository>();
+        var repositoryEntities = await repositoryRepo.Query()
+            .Where(r => r.Platform == PlatformType.GitHub)
+            .OrderByDescending(r => r.StargazersCount)
+            .ToListAsync(cancellationToken);
+
+        var repositories = repositoryEntities
+            .Select(MapRepositoryEntity)
+            .ToList();
+
+        if (repositories.Any())
+        {
+            await _cacheService.SetAsync(cacheKey, repositories, CacheDurations.GitHubRepositories, cancellationToken);
+        }
+
+        return Ok(new
+        {
+            success = true,
+            repositories,
+            lastSyncedAt = repositories.Any() ? repositories.Max(r => (DateTime?)r.UpdatedAt) : null
+        });
+    }
+
     /// <summary>
     /// Sync repositories from GitHub for the authenticated user
     /// </summary>
@@ -209,16 +282,14 @@ public class GitHubController : ControllerBase
     {
         _logger.LogInformation("Starting repository sync for user");
 
-        // Get currently logged-in user
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!TryGetUserId(out var userId))
         {
             _logger.LogWarning("Sync repositories called without authenticated user");
             throw new UnauthorizedAccessException("User not authenticated");
         }
 
         // Get user from database with GitHub token
-        var user = await _userManager.FindByIdAsync(userId)
+        var user = await _userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException($"User {userId} not found");
 
         // Check if GitHub is connected
@@ -234,8 +305,21 @@ public class GitHubController : ControllerBase
             user.GitHubAccessToken, cancellationToken);
 
         // Save repositories to database
+        var repositories = githubRepos.ToList();
         var (addedCount, updatedCount) = await SaveRepositoriesToDatabaseAsync(
-            githubRepos, user, cancellationToken);
+            repositories, cancellationToken);
+
+        await _cacheService.SetAsync(
+            CacheKeys.GitHubRepositories(userId),
+            repositories,
+            CacheDurations.GitHubRepositories,
+            cancellationToken);
+
+        foreach (var limit in RecentCommitLimits)
+        {
+            await _cacheService.RemoveAsync(CacheKeys.GitHubRecentCommits(userId, limit), cancellationToken);
+        }
+        await _cacheService.RemoveAsync(CacheKeys.GitHubRepositories(userId), cancellationToken);
             
         _logger.LogInformation("Successfully synced {Count} repositories for user {UserId}",
             githubRepos.Count(), userId);
@@ -243,9 +327,56 @@ public class GitHubController : ControllerBase
         return Ok(new
         {
             success = true,
-            count = githubRepos.Count(),
-            repositories = githubRepos
+            count = repositories.Count,
+            repositories
         });
+    }
+
+    private sealed class GitHubConnectionStatusResponse
+    {
+        public bool Connected { get; set; }
+        public string? Username { get; set; }
+        public DateTime? ConnectedAt { get; set; }
+    }
+
+    private sealed class RecentCommitsResponse
+    {
+        public bool Success { get; set; }
+        public int TotalCommits { get; set; }
+        public IReadOnlyCollection<RecentCommitSummary> RecentCommits { get; set; } = Array.Empty<RecentCommitSummary>();
+    }
+
+    private sealed class RecentCommitSummary
+    {
+        public string Sha { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string AuthorName { get; set; } = string.Empty;
+        public DateTime CommittedAt { get; set; }
+        public string RepositoryName { get; set; } = string.Empty;
+        public int LinesAdded { get; set; }
+        public int LinesRemoved { get; set; }
+    }
+
+    private static GitHubRepositoryDto MapRepositoryEntity(Repository repository)
+    {
+        _ = repository ?? throw new ArgumentNullException(nameof(repository));
+        return new GitHubRepositoryDto
+        {
+            Id = long.TryParse(repository.ExternalId, out var parsedId) ? parsedId : 0,
+            Name = repository.Name,
+            Description = repository.Description,
+            HtmlUrl = repository.Url ?? string.Empty,
+            FullName = repository.FullName,
+            IsPrivate = repository.IsPrivate,
+            IsFork = repository.IsFork,
+            StargazersCount = repository.StargazersCount,
+            ForksCount = repository.ForksCount,
+            OpenIssuesCount = repository.OpenIssuesCount,
+            Language = repository.Language,
+            CreatedAt = repository.CreatedAt,
+            UpdatedAt = repository.UpdatedAt ?? repository.CreatedAt,
+            PushedAt = repository.PushedAt
+        };
     }
 
     /// <summary>
@@ -261,13 +392,12 @@ public class GitHubController : ControllerBase
     {
         _logger.LogInformation("Starting commit sync for GitHub repository {GitHubRepositoryId}", githubRepositoryId);
 
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!TryGetUserId(out var userId))
         {
             throw new UnauthorizedAccessException("User not authenticated");
         }
 
-        var user = await _userManager.FindByIdAsync(userId)
+        var user = await _userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException("User not found");
 
         if (string.IsNullOrEmpty(user.GitHubAccessToken) || string.IsNullOrEmpty(user.GitHubUsername))
@@ -301,6 +431,11 @@ public class GitHubController : ControllerBase
         await repositoryRepo.UpdateAsync(repository, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        foreach (var limit in RecentCommitLimits)
+        {
+            await _cacheService.RemoveAsync(CacheKeys.GitHubRecentCommits(userId, limit), cancellationToken);
+        }
+
         _logger.LogInformation(
              "Successfully synced {Total} commits for repository {RepositoryId} ({Added} new, {Updated} updated)",
              addedCount + updatedCount, repositoryId, addedCount, updatedCount);
@@ -328,11 +463,18 @@ public class GitHubController : ControllerBase
     {
         try
         {
-            // Get currently logged-in user
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (!TryGetUserId(out var userId))
             {
                 return Unauthorized(new {error = "User not authenticated"});
+            }
+
+            limit = Math.Clamp(limit, 1, 50);
+
+            var cacheKey = CacheKeys.GitHubRecentCommits(userId, limit);
+            var cached = await _cacheService.GetAsync<RecentCommitsResponse>(cacheKey, cancellationToken);
+            if (cached is not null)
+            {
+                return Ok(cached);
             }
             
             // Fetch recent commits from database
@@ -342,27 +484,28 @@ public class GitHubController : ControllerBase
                 .Include(c => c.Repository)
                 .OrderByDescending(c => c.CommittedAt)
                 .Take(limit)
-                .Select(c => new
+                .Select(c => new RecentCommitSummary
                 {
-                    sha = c.Sha,
-                    message = c.Message,
-                    authorName = c.Developer != null ? c.Developer.DisplayName : "Unknown Author Name",
-                    committedAt = c.CommittedAt,
-                    repositoryName = c.Repository != null ? c.Repository.Name : "Unknown Repository Name",
-                    linesAdded = c.LinesAdded,
-                    linesRemoved = c.LinesRemoved
+                    Sha = c.Sha,
+                    Message = c.Message,
+                    AuthorName = c.Developer != null ? c.Developer.DisplayName ?? "Unknown Author" : "Unknown Author",
+                    CommittedAt = c.CommittedAt,
+                    RepositoryName = c.Repository != null ? c.Repository.Name ?? "Unknown Repository" : "Unknown Repository",
+                    LinesAdded = c.LinesAdded,
+                    LinesRemoved = c.LinesRemoved
                 })
                 .ToListAsync(cancellationToken);
             
-            // Get total commit count
-            var totalCommits = recentCommits.Count();
-
-            return Ok(new
+            var response = new RecentCommitsResponse
             {
-                success = true,
-                totalCommits = totalCommits,
-                recentCommits = recentCommits
-            });
+                Success = true,
+                TotalCommits = recentCommits.Count,
+                RecentCommits = recentCommits
+            };
+
+            await _cacheService.SetAsync(cacheKey, response, CacheDurations.DashboardMetrics, cancellationToken);
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -376,12 +519,10 @@ public class GitHubController : ControllerBase
     /// Saves or updates repositories in the database
     /// </summary>
     /// <param name="githubRepos">GitHub repository DTOs to save</param>
-    /// <param name="user">Current application user</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple with (addedCount, updatedCount)</returns>
     private async Task<(int addedCount, int updatedCount)> SaveRepositoriesToDatabaseAsync(
         IEnumerable<GitHubRepositoryDto> githubRepos,
-        ApplicationUser user,
         CancellationToken cancellationToken)
     {
         var repositoryRepo = _unitOfWork.Repository<Repository>();
@@ -403,7 +544,7 @@ public class GitHubController : ControllerBase
                 existingRepo.Name = githubRepo.Name;
                 existingRepo.Description = githubRepo.Description;
                 existingRepo.Url = githubRepo.HtmlUrl;
-                existingRepo.FullName = $"{user.GitHubUsername}/{githubRepo.Name}";
+                existingRepo.FullName = githubRepo.FullName ?? existingRepo.FullName;
                 existingRepo.IsPrivate = githubRepo.IsPrivate;
                 existingRepo.IsFork = githubRepo.IsFork;
                 existingRepo.StargazersCount = githubRepo.StargazersCount;
@@ -430,7 +571,7 @@ public class GitHubController : ControllerBase
                     ExternalId = githubRepo.Id.ToString(),
                     Url = githubRepo.HtmlUrl,
                     DefaultBranch = "main", // GitHub default
-                    FullName = $"{user.GitHubUsername}/{githubRepo.Name}",
+                    FullName = githubRepo.FullName ?? githubRepo.Name,
                     IsPrivate = githubRepo.IsPrivate,
                     IsFork = githubRepo.IsFork,
                     StargazersCount = githubRepo.StargazersCount,
@@ -586,13 +727,12 @@ public class GitHubController : ControllerBase
     {
         _logger.LogInformation("Starting PR sync for repository {RepositoryId}", repositoryId);
 
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!TryGetUserId(out var userId))
         {
             throw new UnauthorizedAccessException("User not authenticated");
         }
 
-        var user = await _userManager.FindByIdAsync(userId)
+        var user = await _userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException("User not found");
 
         if (string.IsNullOrEmpty(user.GitHubAccessToken))

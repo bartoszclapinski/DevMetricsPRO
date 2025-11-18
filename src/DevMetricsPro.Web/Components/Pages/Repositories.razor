@@ -258,18 +258,18 @@ else
                 return;
             }
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "/api/github/sync-repositories");
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/github/repositories");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             
             var response = await Http.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<SyncRepositoriesResponse>();
+                var result = await response.Content.ReadFromJsonAsync<GetRepositoriesResponse>();
                 if (result?.Success == true && result.Repositories != null)
                 {
                     _repositories = result.Repositories.OrderByDescending(r => r.StargazersCount).ToList();
-                    _lastSyncTime = DateTime.UtcNow;
+                    _lastSyncTime = result.LastSyncedAt;
                     Logger.LogInformation("Loaded {Count} repositories", _repositories.Count);
                 }
             }
@@ -301,15 +301,28 @@ else
         
         try
         {
-            await LoadRepositoriesAsync();
-            
-            if (string.IsNullOrEmpty(_errorMessage))
+            var token = await AuthState.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
             {
-                Snackbar.Add($"Successfully synced {_repositories.Count} repositories!", Severity.Success);
+                Snackbar.Add("Authentication required", Severity.Warning);
+                return;
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/github/sync-repositories");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<SyncRepositoriesResponse>();
+                Snackbar.Add($"Successfully synced {result?.Count ?? 0} repositories!", Severity.Success);
+                await LoadRepositoriesAsync();
             }
             else
             {
-                Snackbar.Add(_errorMessage, Severity.Error);
+                var message = await ResolveProblemDetailsMessageAsync(response, "Failed to sync repositories.");
+                Snackbar.Add(message, Severity.Error);
             }
         }
         finally
@@ -388,6 +401,13 @@ else
         public bool Success { get; set; }
         public int Count { get; set; }
         public List<GitHubRepositoryDto>? Repositories { get; set; }
+    }
+
+    private class GetRepositoriesResponse
+    {
+        public bool Success { get; set; }
+        public List<GitHubRepositoryDto>? Repositories { get; set; }
+        public DateTime? LastSyncedAt { get; set; }
     }
 
     private class GitHubStatusResponse

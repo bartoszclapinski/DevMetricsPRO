@@ -1,3 +1,4 @@
+using DevMetricsPro.Application.Caching;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
@@ -19,6 +20,8 @@ public class SyncGitHubDataJob
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<SyncGitHubDataJob> _logger;
+    private readonly ICacheService _cacheService;
+    private static readonly int[] RecentCommitLimits = [10];
 
     public SyncGitHubDataJob(
         IGitHubRepositoryService repositoryService,
@@ -27,7 +30,8 @@ public class SyncGitHubDataJob
         IMetricsCalculationService metricsService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
-        ILogger<SyncGitHubDataJob> logger)
+        ILogger<SyncGitHubDataJob> logger,
+        ICacheService cacheService)
     {
         _repositoryService = repositoryService;
         _commitsService = commitsService;
@@ -36,6 +40,7 @@ public class SyncGitHubDataJob
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     /// <summary>
@@ -196,6 +201,8 @@ public class SyncGitHubDataJob
                 "GitHub data sync completed for user {UserId}. " +
                 "Synced {RepoCount} repositories, {CommitCount} commits, {PRCount} pull requests, and calculated metrics",
                 userId, syncedRepos.Count, totalCommitsSynced, totalPRsSynced);
+
+            await InvalidateCacheAsync(userId, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -266,6 +273,17 @@ public class SyncGitHubDataJob
 
         await _unitOfWork.SaveChangesAsync();
         return savedRepos;
+    }
+
+    private async Task InvalidateCacheAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await _cacheService.RemoveAsync(CacheKeys.GitHubRepositories(userId), cancellationToken);
+        await _cacheService.RemoveAsync(CacheKeys.GitHubConnectionStatus(userId), cancellationToken);
+
+        foreach (var limit in RecentCommitLimits)
+        {
+            await _cacheService.RemoveAsync(CacheKeys.GitHubRecentCommits(userId, limit), cancellationToken);
+        }
     }
 
     private async Task<(int addedCount, int updatedCount)> SaveCommitsToDatabaseAsync(
