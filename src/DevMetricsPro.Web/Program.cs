@@ -63,8 +63,20 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
 
-    // Session support (for OAuth state validation)
-    builder.Services.AddDistributedMemoryCache();
+    // Distributed cache (Redis preferred, memory fallback) + session
+    var redisConnection = builder.Configuration.GetConnectionString("Redis");
+    if (!string.IsNullOrWhiteSpace(redisConnection))
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = redisConnection;
+        });
+    }
+    else
+    {
+        builder.Services.AddDistributedMemoryCache();
+    }
+
     builder.Services.AddSession(options =>
     {
         options.IdleTimeout = TimeSpan.FromMinutes(10);
@@ -120,6 +132,7 @@ try
     builder.Services.AddScoped<IGitHubRepositoryService, GitHubRepositoryService>();
     builder.Services.AddScoped<IGitHubCommitsService, GitHubCommitsService>();
     builder.Services.AddScoped<IGitHubPullRequestService, GitHubPullRequestService>();
+    builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
     // Metrics Calculation Service
     builder.Services.AddScoped<IMetricsCalculationService, MetricsCalculationService>();
