@@ -1319,10 +1319,10 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 ### Day 14 - November 17, 2025 (later)
 **Focus**:
-- Phase 2.C.3 task “Add error logging to Application Insights/Serilog” (Issue #93)
+- Phase 2.C.3 task "Add error logging to Application Insights/Serilog" (Issue #93)
 
 **Highlights**:
-- Added `Microsoft.ApplicationInsights.AspNetCore` + `Serilog.Sinks.ApplicationInsights`, surfaced configuration knobs in `appsettings*.json`, and wired telemetry registration to only activate when a connection string is provided (so devs aren’t forced to provision AI locally).
+- Added `Microsoft.ApplicationInsights.AspNetCore` + `Serilog.Sinks.ApplicationInsights`, surfaced configuration knobs in `appsettings*.json`, and wired telemetry registration to only activate when a connection string is provided (so devs aren't forced to provision AI locally).
 - Updated `Program.cs` to:
   - Bootstrap Serilog early, then rebuild the pipeline via `UseSerilog` with DI/Configuration.
   - Forward console + rolling file logs, and conditionally fan out to Application Insights using `TelemetryConverter.Traces`.
@@ -1334,6 +1334,91 @@ Integrate with GitHub to fetch and sync developer metrics with background proces
 
 **Notes / Next Steps**:
 - Phase 2.C.3 is now fully green (Issue #93 ready to close once branch is reviewed/merged). Next phase in the cleanup plan: 2.C.4 Caching Layer.
+
+---
+
+### Day 15 - November 18, 2025
+**Phases completed**:
+- [x] Phase 2.C.4: Caching Layer ✅
+
+**What I learned**:
+
+**Phase 2.C.4 - Caching Layer:**
+- Created `ICacheService` abstraction in Application layer with generic Get/Set/Remove operations
+- Implemented `RedisCacheService` in Infrastructure layer using StackExchange.Redis
+- Added fallback to in-memory cache when Redis connection string not provided
+- Created `CacheKeys` helper class for consistent cache key generation:
+  - `GitHubRepositories(userId)` - Repository lists per user
+  - `GitHubConnectionStatus(userId)` - Connection status per user
+  - `DashboardMetrics(userId)` - Dashboard metrics per user
+- Created `CacheDurations` constants class for TTL management:
+  - Repository lists: 5 minutes
+  - Connection status: 1 minute
+  - Dashboard metrics: 10 minutes
+- Registered `IDistributedCache` in `Program.cs` with Redis configuration
+- Added `ConnectionStrings:Redis` to appsettings.json (defaults to localhost:6379)
+- Added `StackExchange.Redis` NuGet package to Web project
+- Updated `GitHubController` with caching:
+  - Created new `GET /api/github/repositories` endpoint that serves cached data
+  - Added caching to `GetConnectionStatus` endpoint
+  - Added caching to `GetRecentCommits` endpoint
+  - Added cache invalidation in `Callback` (OAuth connection)
+  - Added cache invalidation in `SyncRepositories` (after repo sync)
+  - Added cache invalidation in `SyncCommits` (after commit sync)
+- Updated `SyncGitHubDataJob` to invalidate all caches after successful sync
+- Updated `Repositories.razor` to use new cached GET endpoint instead of POST
+- Kept manual "Sync Now" button for force refresh
+- All caches automatically invalidate on data changes
+
+**Key Concepts:**
+- **Distributed Caching**: Shared cache across multiple app instances (Redis)
+- **Cache-Aside Pattern**: Check cache first, load from DB on miss, store in cache
+- **TTL (Time To Live)**: Automatic cache expiration after specified duration
+- **Cache Invalidation**: Manually remove stale data after updates
+- **Fallback Strategy**: Use in-memory cache when Redis unavailable
+- **Cache Keys**: Consistent naming convention for cache entries
+- **JSON Serialization**: Store complex objects as JSON strings in cache
+
+**Why Redis?**
+- **Fast**: In-memory data store (microsecond latency)
+- **Distributed**: Shared across multiple app instances
+- **Persistent**: Optional data persistence to disk
+- **Scalable**: Can handle millions of operations per second
+- **Battle-tested**: Industry standard for caching
+
+**Challenges:**
+- **Issue**: Duplicate `user` variable in `GetConnectionStatus`
+  - Problem: Declared `user` twice in same scope after adding caching
+  - Solution: Removed duplicate declaration, reused existing variable
+- **Issue**: Need to balance cache TTL vs data freshness
+  - Solution: Used shorter TTLs (1-10 min) with manual invalidation on updates
+
+**Testing:**
+- ✅ Solution builds: 0 errors, 0 warnings
+- ✅ All tests pass: `dotnet test`
+- ✅ Cache service registered correctly
+- ✅ Redis connection string in appsettings
+- ✅ Fallback to memory cache works
+- ✅ Cache invalidation triggers on sync operations
+
+**Technical Achievements:**
+- Completed Phase 2.C.4 of cleanup plan
+- Full caching layer with Redis support
+- Automatic cache invalidation on data changes
+- Performance improvement for frequently accessed data
+- Foundation ready for high-traffic scenarios
+
+**Time spent**: ~3 hours  
+**Blockers**: None  
+**Notes**: 
+- 🎉 **PHASE 2.C.4 COMPLETE!** Caching layer fully implemented
+- Redis caching working with proper invalidation
+- All endpoints benefit from caching
+- Background jobs invalidate caches automatically
+- Issue #94 closed via PR
+- Feature branch: `sprint2/phase2.C.4-caching-#94`
+- Ready for Phase 2.C.5 (API Pagination)
+- 4 of 8 cleanup phases complete (50%)
 
 ---
 
