@@ -255,14 +255,9 @@ try
     {
         // Note: For MVP, we're not scheduling automatic syncs yet
         // Users will manually trigger syncs from the UI or Hangfire dashboard
-        // In production, you would schedule recurring jobs here like:
+        // Future enhancement: Add recurring jobs for automatic data synchronization
         
-        // RecurringJob.AddOrUpdate<SyncGitHubDataJob>(
-        //     "sync-github-data-hourly",
-        //     job => job.ExecuteAsync(userId), // Would need to iterate all users
-        //     Cron.Hourly);
-        
-        Log.Information("Hangfire recurring jobs configured");
+        Log.Information("Hangfire recurring jobs configured (manual sync only for MVP)");
     }
 }
 catch (Exception ex)
