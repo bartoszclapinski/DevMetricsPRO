@@ -18,7 +18,6 @@ namespace DevMetricsPro.Web.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-// [Authorize]
 public class GitHubController : ControllerBase
 {
     private readonly IGitHubOAuthService _gitHubOAuthService;
@@ -30,6 +29,13 @@ public class GitHubController : ControllerBase
     private readonly IGitHubPullRequestService _gitHubPullRequestService;
     private readonly ICacheService _cacheService;
     private static readonly int[] RecentCommitLimits = [10];
+    
+    // Pagination constants
+    private const int DefaultPageSize = 25;
+    private const int MinPageSize = 10;
+    private const int MaxPageSize = 100;
+    private const int MinPage = 1;
+    private const int MaxRecentCommitLimit = 50;
 
     public GitHubController(IGitHubOAuthService gitHubOAuthService,
         UserManager<ApplicationUser> userManager,
@@ -460,8 +466,8 @@ public class GitHubController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResult<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCommits(
         [FromQuery] Guid? repositoryId = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
+        [FromQuery] int page = MinPage,
+        [FromQuery] int pageSize = DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetUserId(out var userId))
@@ -470,8 +476,8 @@ public class GitHubController : ControllerBase
         }
 
         // Validate and clamp pagination parameters
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 10, 100);
+        page = Math.Max(MinPage, page);
+        pageSize = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
 
         var commitRepo = _unitOfWork.Repository<Commit>();
         var query = commitRepo.Query()
@@ -539,7 +545,7 @@ public class GitHubController : ControllerBase
                 return Unauthorized(new {error = "User not authenticated"});
             }
 
-            limit = Math.Clamp(limit, 1, 50);
+            limit = Math.Clamp(limit, MinPage, MaxRecentCommitLimit);
 
             var cacheKey = CacheKeys.GitHubRecentCommits(userId, limit);
             var cached = await _cacheService.GetAsync<RecentCommitsResponse>(cacheKey, cancellationToken);
@@ -1023,8 +1029,8 @@ public class GitHubController : ControllerBase
     public async Task<IActionResult> GetPullRequests(
         [FromQuery] Guid? repositoryId = null,
         [FromQuery] string? status = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
+        [FromQuery] int page = MinPage,
+        [FromQuery] int pageSize = DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
         if (!TryGetUserId(out var userId))
@@ -1033,8 +1039,8 @@ public class GitHubController : ControllerBase
         }
 
         // Validate and clamp pagination parameters
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 10, 100);
+        page = Math.Max(MinPage, page);
+        pageSize = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
 
         var prRepository = _unitOfWork.Repository<PullRequest>();
         

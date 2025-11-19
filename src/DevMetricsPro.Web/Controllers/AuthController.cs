@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             throw new ValidationException(identityErrors);
         }
 
-        // TODO: Add default role after implementing role seeding
+        // Future enhancement: Add default role assignment after implementing role seeding
         // await _userManager.AddToRoleAsync(user, "User");
 
         // Generate JWT token

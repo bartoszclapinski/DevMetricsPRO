@@ -14,7 +14,7 @@ public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
         var httpContext = context.GetHttpContext();
         
         // In development, allow all access for testing
-        // TODO: In production, require authentication
+        // Future enhancement: In production, require authentication for Hangfire dashboard
         #if DEBUG
             return true;
         #else
