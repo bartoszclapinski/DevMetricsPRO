@@ -1,5 +1,6 @@
 using DevMetricsPro.Application.Caching;
 using DevMetricsPro.Application.DTOs.GitHub;
+using DevMetricsPro.Application.DTOs.Common;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
@@ -452,7 +453,77 @@ public class GitHubController : ControllerBase
     }
 
     /// <summary>
-    /// Get recent commits across all repositories for the authenticated user
+    /// Get commits with pagination support
+    /// </summary>
+    [HttpGet("commits")]
+    [Authorize(AuthenticationSchemes = "Bearer")]
+    [ProducesResponseType(typeof(PaginatedResult<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCommits(
+        [FromQuery] Guid? repositoryId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized(new {error = "User not authenticated"});
+        }
+
+        // Validate and clamp pagination parameters
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+
+        var commitRepo = _unitOfWork.Repository<Commit>();
+        var query = commitRepo.Query()
+            .Include(c => c.Developer)
+            .Include(c => c.Repository)
+            .AsQueryable();
+
+        // Filter by repository if specified
+        if (repositoryId.HasValue)
+        {
+            query = query.Where(c => c.RepositoryId == repositoryId.Value);
+        }
+
+        // Get total count before pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Apply pagination
+        var commits = await query
+            .OrderByDescending(c => c.CommittedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new
+            {
+                sha = c.Sha,
+                message = c.Message,
+                authorName = c.Developer != null ? c.Developer.DisplayName ?? "Unknown Author" : "Unknown Author",
+                committedAt = c.CommittedAt,
+                repositoryName = c.Repository != null ? c.Repository.Name ?? "Unknown Repository" : "Unknown Repository",
+                repositoryId = c.RepositoryId,
+                linesAdded = c.LinesAdded,
+                linesRemoved = c.LinesRemoved,
+                filesChanged = c.FilesChanged
+            })
+            .ToListAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Fetched page {Page} of commits ({Count} items, {Total} total)",
+            page, commits.Count, totalCount);
+
+        var result = new PaginatedResult<object>
+        {
+            Items = commits,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get recent commits across all repositories for the authenticated user (legacy endpoint for dashboard)
     /// </summary>
     [HttpGet("commits/recent")]
     [Authorize(AuthenticationSchemes = "Bearer")]
@@ -943,29 +1014,39 @@ public class GitHubController : ControllerBase
     }
 
     /// <summary>
-    /// Get all pull requests from database with optional filtering
+    /// Get all pull requests from database with optional filtering and pagination
     /// </summary>
     [HttpGet("pull-requests")]
     [Authorize(AuthenticationSchemes = "Bearer")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResult<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetPullRequests(
         [FromQuery] Guid? repositoryId = null,
         [FromQuery] string? status = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
         CancellationToken cancellationToken = default)
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!TryGetUserId(out var userId))
         {
             throw new UnauthorizedAccessException("User not authenticated");
         }
 
+        // Validate and clamp pagination parameters
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 10, 100);
+
         var prRepository = _unitOfWork.Repository<PullRequest>();
-        var pullRequests = await prRepository.GetAllAsync(cancellationToken);
+        
+        // Build query with filters
+        var query = prRepository.Query()
+            .Include(pr => pr.Author)
+            .Include(pr => pr.Repository)
+            .AsQueryable();
 
         if (repositoryId.HasValue)
         {
-            pullRequests = pullRequests.Where(pr => pr.RepositoryId == repositoryId.Value);
+            query = query.Where(pr => pr.RepositoryId == repositoryId.Value);
         }
 
         if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
@@ -980,12 +1061,18 @@ public class GitHubController : ControllerBase
 
             if (prStatus.HasValue)
             {
-                pullRequests = pullRequests.Where(pr => pr.Status == prStatus.Value);
+                query = query.Where(pr => pr.Status == prStatus.Value);
             }
         }
 
-        var sortedPRs = pullRequests
+        // Get total count before pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Apply pagination
+        var pullRequests = await query
             .OrderByDescending(pr => pr.UpdatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(pr => new
             {
                 id = pr.Id,
@@ -994,27 +1081,32 @@ public class GitHubController : ControllerBase
                 description = pr.Description,
                 status = pr.Status.ToString(),
                 isMerged = pr.Status == PullRequestStatus.Merged,
-                authorName = pr.Author?.DisplayName ?? "Unknown",
-                authorUsername = pr.Author?.GitHubUsername ?? "Unknown",
-                repositoryName = pr.Repository?.Name ?? "Unknown",
+                authorName = pr.Author != null ? pr.Author.DisplayName ?? "Unknown" : "Unknown",
+                authorUsername = pr.Author != null ? pr.Author.GitHubUsername ?? "Unknown" : "Unknown",
+                repositoryName = pr.Repository != null ? pr.Repository.Name ?? "Unknown" : "Unknown",
                 repositoryId = pr.RepositoryId,
                 createdAt = pr.CreatedAt,
                 updatedAt = pr.UpdatedAt,
                 closedAt = pr.ClosedAt,
                 mergedAt = pr.MergedAt,
-                url = pr.Repository?.FullName != null ? 
-                    $"https://github.com/{pr.Repository?.FullName}/pull/{pr.ExternalId}" : null
+                url = pr.Repository != null && pr.Repository.FullName != null ? 
+                    $"https://github.com/{pr.Repository.FullName}/pull/{pr.ExternalId}" : null
             })
-            .ToList();
+            .ToListAsync(cancellationToken);
 
-        _logger.LogInformation("Fetched {Count} pull requests from database", sortedPRs.Count);
+        _logger.LogInformation(
+            "Fetched page {Page} of pull requests ({Count} items, {Total} total)",
+            page, pullRequests.Count, totalCount);
 
-        return Ok(new
+        var result = new PaginatedResult<object>
         {
-            success = true,
-            count = sortedPRs.Count,
-            pullRequests = sortedPRs
-        });
+            Items = pullRequests,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+
+        return Ok(result);
     }
     
 }
