@@ -6,9 +6,11 @@ using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
 using DevMetricsPro.Core.Exceptions;
 using DevMetricsPro.Core.Interfaces;
+using DevMetricsPro.Web.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace DevMetricsPro.Web.Controllers;
@@ -18,6 +20,7 @@ namespace DevMetricsPro.Web.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting(RateLimitingConfiguration.ApiPolicy)]
 public class GitHubController : ControllerBase
 {
     private readonly IGitHubOAuthService _gitHubOAuthService;
@@ -281,6 +284,7 @@ public class GitHubController : ControllerBase
     /// </summary>
     /// <returns>List of synced repositories</returns>
     [HttpPost("sync-repositories")]
+    [EnableRateLimiting(RateLimitingConfiguration.SyncPolicy)]
     [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -390,6 +394,7 @@ public class GitHubController : ControllerBase
     /// Sync commits for a specific repository
     /// </summary>
     [HttpPost("commits/sync/{githubRepositoryId}")]
+    [EnableRateLimiting(RateLimitingConfiguration.SyncPolicy)]
     [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -793,6 +798,7 @@ public class GitHubController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Sync statistics</returns>
     [HttpPost("pull-requests/sync/{repositoryId:guid}")]
+    [EnableRateLimiting(RateLimitingConfiguration.SyncPolicy)]
     [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -983,6 +989,7 @@ public class GitHubController : ControllerBase
     /// </summary>
     /// <returns>Job ID</returns>
     [HttpPost("sync-all")]
+    [EnableRateLimiting(RateLimitingConfiguration.SyncPolicy)]
     [Authorize(AuthenticationSchemes = "Bearer")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

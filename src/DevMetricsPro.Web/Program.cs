@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Serilog;
 using DevMetricsPro.Web.Middleware;
+using DevMetricsPro.Web.Configuration;
 using DevMetricsPro.Core.Entities;
 using Microsoft.AspNetCore.Identity;
 using DevMetricsPro.Application.Interfaces;
@@ -22,6 +23,7 @@ using DevMetricsPro.Application.Validators;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.ApplicationInsights.Extensibility;
 using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
+using Microsoft.AspNetCore.Http.Features;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -82,6 +84,25 @@ try
         options.IdleTimeout = TimeSpan.FromMinutes(10);
         options.Cookie.HttpOnly = true;
         options.Cookie.IsEssential = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Require HTTPS
+        options.Cookie.SameSite = SameSiteMode.Strict; // CSRF protection
+    });
+
+    // Security: Rate limiting policies
+    builder.Services.AddRateLimitingPolicies();
+
+    // Security: CORS policies
+    builder.Services.AddCorsPolicies(builder.Configuration);
+
+    // Security: Request size limits
+    builder.Services.Configure<FormOptions>(options =>
+    {
+        options.MultipartBodyLengthLimit = builder.Configuration.GetValue<long>("Security:MaxMultipartBodyLength", 10485760); // 10 MB default
+    });
+    
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = builder.Configuration.GetValue<long>("Security:MaxRequestBodySize", 10485760); // 10 MB default
     });
 
     // Add services to the container.
@@ -220,6 +241,15 @@ try
     }
 
     app.UseHttpsRedirection();
+
+    // Security: Add security headers (CSP, X-Frame-Options, etc.)
+    app.UseSecurityHeaders();
+
+    // Security: Enable CORS
+    app.UseCors(CorsConfiguration.DefaultPolicy);
+
+    // Security: Enable rate limiting
+    app.UseRateLimiter();
 
     // Add correlation ID to all requests for distributed tracing
     app.UseCorrelationId();
