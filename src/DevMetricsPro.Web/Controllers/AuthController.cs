@@ -2,8 +2,10 @@ using DevMetricsPro.Application.DTOs.Auth;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Exceptions;
+using DevMetricsPro.Web.Configuration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Linq;
 
 namespace DevMetricsPro.Web.Controllers;
@@ -13,6 +15,7 @@ namespace DevMetricsPro.Web.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting(RateLimitingConfiguration.ApiPolicy)]
 public class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -42,6 +45,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Registration details</param>
     /// <returns>JWT token and user information</returns>
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitingConfiguration.AuthPolicy)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
@@ -93,6 +97,7 @@ public class AuthController : ControllerBase
     /// <param name="request">Login credentials</param>
     /// <returns>JWT token and user information</returns>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitingConfiguration.AuthPolicy)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
