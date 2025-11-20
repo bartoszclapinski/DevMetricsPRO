@@ -221,6 +221,12 @@ try
 
     app.UseHttpsRedirection();
 
+    // Add correlation ID to all requests for distributed tracing
+    app.UseCorrelationId();
+
+    // Log performance metrics for slow requests
+    app.UsePerformanceLogging();
+
     app.UseSerilogRequestLogging();
 
     // Authentication and authorization
