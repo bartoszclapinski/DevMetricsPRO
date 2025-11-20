@@ -28,7 +28,8 @@ public class GlobalExceptionHandler : IExceptionHandler
         CancellationToken cancellationToken)
     {
         var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
-        var traceId = httpContext.TraceIdentifier;
+        // Use correlation ID if available, otherwise fall back to TraceIdentifier
+        var traceId = httpContext.Items["CorrelationId"]?.ToString() ?? httpContext.TraceIdentifier;
 
         ProblemDetails problem;
         switch (exception)
