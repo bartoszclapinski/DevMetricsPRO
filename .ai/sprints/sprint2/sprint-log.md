@@ -1649,7 +1649,9 @@ _(Add screenshots of OAuth flow, connected account, GitHub dashboard)_
 - [x] Comprehensive logging and monitoring
 
 **Date completed**: November 20, 2025  
-**Release tag**: v0.3-sprint2 (to be created after all PRs merged)
+**Release tags**: 
+- `v0.3-sprint2` - Main Sprint 2 features
+- `v0.4-sprint2-complete` - Production-ready with all cleanup phases ✅
 
 **Sprint 3 Preview**: Advanced features including charts/visualizations, team analytics, custom dashboards, and real-time notifications!
 
