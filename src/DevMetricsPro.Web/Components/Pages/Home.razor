@@ -49,6 +49,17 @@ else
             Trend="MetricCard.TrendDirection.Up" />
     </div>
 
+    <!-- Test Chart - Phase 3.1 -->
+    <MudPaper Class="pa-4 mt-4">
+        <MudText Typo="Typo.h5" Class="mb-4">📈 Test Chart: Commits Last 7 Days</MudText>
+        
+        <LineChart 
+            Labels="@_testLabels" 
+            Data="@_testData"
+            ChartTitle="Daily Commits"
+            ShowLegend="true" />
+    </MudPaper>
+
     <!-- Panels Grid -->
     <div class="panel-grid" style="margin-top: 24px;">
         <DataPanel Title="Activity Overview">
@@ -143,6 +154,17 @@ else
     private bool isGitHubConnected = false;
     private string? githubUsername;
     private string? githubConnectedMessage;
+
+    // Test data for Phase 3.1
+    private List<string> _testLabels = new() 
+    { 
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" 
+    };
+
+    private List<int> _testData = new() 
+    { 
+        12, 19, 8, 15, 22, 10, 14 
+    };
 
     protected override async Task OnInitializedAsync()
     {

@@ -1,0 +1,98 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="chart-container">
+    @if (_isLoading)
+    {
+        <div class="chart-loading">
+            <MudProgressCircular Indeterminate="true" />
+            <MudText>Loading chart...</MudText>
+        </div>
+    }
+    else if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        <canvas id="@_chartId"></canvas>
+    }
+</div>
+
+@code {
+    private string _chartId = $"chart-{Guid.NewGuid():N}";
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    [Parameter]
+    public List<string> Labels { get; set; } = new();
+
+    [Parameter]
+    public List<int> Data { get; set; } = new();
+
+    [Parameter]
+    public string ChartTitle { get; set; } = "Chart";
+
+    [Parameter]
+    public bool ShowLegend { get; set; } = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeChartAsync();
+        }
+    }
+
+    private async Task InitializeChartAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
+
+            var config = new
+            {
+                data = new
+                {
+                    labels = Labels,
+                    datasets = new[]
+                    {
+                        new
+                        {
+                            label = ChartTitle,
+                            data = Data,
+                            borderColor = "rgb(75, 192, 192)",
+                            backgroundColor = "rgba(75, 192, 192, 0.2)",
+                            tension = 0.4
+                        }
+                    }
+                },
+                showLegend = ShowLegend
+            };
+
+            await JSRuntime.InvokeVoidAsync("chartHelpers.createLineChart", _chartId, config);
+
+            _isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to create chart: {ex.Message}";
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("chartHelpers.destroyChart", _chartId);
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
+    }
+}
