@@ -20,10 +20,9 @@ using Hangfire.PostgreSql;
 using FluentValidation.AspNetCore;
 using FluentValidation;
 using DevMetricsPro.Application.Validators;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.ApplicationInsights.Extensibility;
-using Serilog.Sinks.ApplicationInsights.TelemetryConverters;
 using Microsoft.AspNetCore.Http.Features;
+using DevMetricsPro.Application.Services;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -116,6 +115,9 @@ try
     // Repository Pattern - Scoped lifetime for per-request instances
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+    // Chart data services
+builder.Services.AddScoped<IChartDataService, ChartDataService>();
     
     // Authentication state service
     builder.Services.AddScoped<AuthStateService>();

@@ -1,6 +1,10 @@
 ﻿@page "/"
+@using DevMetricsPro.Application.DTOs.Charts
+@using DevMetricsPro.Application.Interfaces
+@using DevMetricsPro.Web.Components.Shared.Charts
 @using DevMetricsPro.Web.Services
 @inject AuthStateService AuthState
+@inject IChartDataService ChartDataService
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
@@ -49,15 +53,77 @@ else
             Trend="MetricCard.TrendDirection.Up" />
     </div>
 
-    <!-- Test Chart - Phase 3.1 -->
+    <!-- Commit Activity Chart - Phase 3.2 -->
     <MudPaper Class="pa-4 mt-4">
-        <MudText Typo="Typo.h5" Class="mb-4">📈 Test Chart: Commits Last 7 Days</MudText>
-        
-        <LineChart 
-            Labels="@_testLabels" 
-            Data="@_testData"
-            ChartTitle="Daily Commits"
-            ShowLegend="true" />
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <MudText Typo="Typo.h5">📈 Commit Activity</MudText>
+            
+            <!-- Time Range Selector -->
+            <div style="display: flex; gap: 8px;">
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedDays == 7 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadCommitActivityAsync(7)">
+                    7 Days
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedDays == 30 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadCommitActivityAsync(30)">
+                    30 Days
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedDays == 90 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadCommitActivityAsync(90)">
+                    90 Days
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_isLoadingChart)
+        {
+            <div style="text-align: center; padding: 60px;">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="mt-2">Loading chart data...</MudText>
+            </div>
+        }
+        else if (_chartData != null && _chartData.TotalCommits > 0)
+        {
+            <!-- Stats Row -->
+            <div style="display: flex; gap: 24px; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.02); border-radius: 4px;">
+                <div>
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Total Commits</MudText>
+                    <MudText Typo="Typo.h6" Style="color: var(--mud-palette-primary);">@_chartData.TotalCommits</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Daily Average</MudText>
+                    <MudText Typo="Typo.h6" Style="color: var(--mud-palette-primary);">@_chartData.AveragePerDay.ToString("F1")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Date Range</MudText>
+                    <MudText Typo="Typo.body2">@_chartData.StartDate.ToString("MMM dd") - @_chartData.EndDate.ToString("MMM dd")</MudText>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <LineChart 
+                Labels="@_chartData.Labels" 
+                Data="@_chartData.Values"
+                ChartTitle="Daily Commits"
+                ShowLegend="true" />
+        }
+        else
+        {
+            <div style="text-align: center; padding: 60px; color: var(--mud-palette-text-secondary);">
+                <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+                <MudText Typo="Typo.h6">No commit data available</MudText>
+                <MudText Typo="Typo.body2">Connect GitHub and sync your repositories to see commit activity</MudText>
+            </div>
+        }
     </MudPaper>
 
     <!-- Panels Grid -->
@@ -155,17 +221,10 @@ else
     private string? githubUsername;
     private string? githubConnectedMessage;
 
-    // Test data for Phase 3.1
-    private List<string> _testLabels = new() 
-    { 
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" 
-    };
-
-    private List<int> _testData = new() 
-    { 
-        12, 19, 8, 15, 22, 10, 14 
-    };
-
+    // Chart data - Phase 3.2
+    private CommitActivityChartDto? _chartData;
+    private bool _isLoadingChart = false;
+    private int _selectedDays = 7;
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
@@ -174,6 +233,7 @@ else
         {
             await CheckGitHubConnectionStatus();
             await LoadRecentCommitsAsync();
+            await LoadCommitActivityAsync(7);
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -315,6 +375,35 @@ else
     {
         var message = await response.ReadProblemDetailsMessageAsync();
         Snackbar.Add(message ?? fallbackMessage, severity);
+    }
+
+    private async Task LoadCommitActivityAsync(int days)
+    {
+        _selectedDays = days;
+        _isLoadingChart = true;
+        StateHasChanged();
+
+        try
+        {
+            var endDate = DateTime.UtcNow;
+            var startDate = endDate.AddDays(-days);
+
+            _chartData = await ChartDataService.GetCommitActivityAsync(
+                developerId: null, // null = all developers
+                startDate: startDate,
+                endDate: endDate,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading commit activity chart");
+            Snackbar.Add("Failed to load chart data", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingChart = false;
+            StateHasChanged();
+        }
     }
 
     // Helper classes for deserializing API responses
