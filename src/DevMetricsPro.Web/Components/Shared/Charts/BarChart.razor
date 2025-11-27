@@ -1,0 +1,153 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="bar-chart-container">
+    <canvas id="@CanvasId"></canvas>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required List<string> Labels { get; set; }
+
+    [Parameter, EditorRequired]
+    public required List<int> Data { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Bar Chart";
+
+    [Parameter]
+    public string Color { get; set; } = "rgba(54, 162, 235, 0.8)";
+
+    [Parameter]
+    public string BorderColor { get; set; } = "rgba(54, 162, 235, 1)";
+
+    private string CanvasId => $"barChart-{_uniqueId}";
+    private readonly string _uniqueId = Guid.NewGuid().ToString("N")[..8];
+    private bool _chartCreated = false;
+    private bool _isDisposed = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isDisposed)
+        {
+            await CreateChartAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_chartCreated && !_isDisposed)
+        {
+            await UpdateChartAsync();
+        }
+    }
+
+    private async Task CreateChartAsync()
+    {
+        try
+        {
+            var config = new
+            {
+                type = "bar",
+                data = new
+                {
+                    labels = Labels,
+                    datasets = new[]
+                    {
+                        new
+                        {
+                            label = Title,
+                            data = Data,
+                            backgroundColor = Color,
+                            borderColor = BorderColor,
+                            borderWidth = 2,
+                            borderRadius = 6
+                        }
+                    }
+                },
+                options = new
+                {
+                    responsive = true,
+                    maintainAspectRatio = false,
+                    plugins = new
+                    {
+                        legend = new
+                        {
+                            display = false
+                        },
+                        title = new
+                        {
+                            display = false
+                        }
+                    },
+                    scales = new
+                    {
+                        y = new
+                        {
+                            beginAtZero = true,
+                            ticks = new
+                            {
+                                precision = 0
+                            }
+                        }
+                    }
+                }
+            };
+
+            await JS.InvokeVoidAsync("chartHelpers.createBarChart", CanvasId, config);
+            _chartCreated = true;
+        }
+        catch (JSException ex)
+        {
+            Console.WriteLine($"Error creating bar chart: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateChartAsync()
+    {
+        try
+        {
+            var newData = new
+            {
+                labels = Labels,
+                datasets = new[]
+                {
+                    new
+                    {
+                        label = Title,
+                        data = Data,
+                        backgroundColor = Color,
+                        borderColor = BorderColor,
+                        borderWidth = 2,
+                        borderRadius = 6
+                    }
+                }
+            };
+
+            await JS.InvokeVoidAsync("chartHelpers.updateChart", CanvasId, newData);
+        }
+        catch (JSException ex)
+        {
+            Console.WriteLine($"Error updating bar chart: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_isDisposed) return;
+        _isDisposed = true;
+
+        try
+        {
+            if (_chartCreated)
+            {
+                await JS.InvokeVoidAsync("chartHelpers.destroyChart", CanvasId);
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit disconnected, can't call JS
+        }
+    }
+}
+

@@ -126,6 +126,92 @@ else
         }
     </MudPaper>
 
+    <!-- PR Statistics Chart - Phase 3.3 -->
+    <MudPaper Class="pa-4 mt-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <MudText Typo="Typo.h5">🔀 Pull Request Statistics</MudText>
+            
+            <!-- Time Range Selector -->
+            <div style="display: flex; gap: 8px;">
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedPRDays == 7 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadPRStatsAsync(7)">
+                    7 Days
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedPRDays == 30 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadPRStatsAsync(30)">
+                    30 Days
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedPRDays == 90 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadPRStatsAsync(90)">
+                    90 Days
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_isLoadingPRChart)
+        {
+            <div style="text-align: center; padding: 60px;">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="mt-2">Loading PR statistics...</MudText>
+            </div>
+        }
+        else if (_prChartData != null && _prChartData.TotalPRs > 0)
+        {
+            <!-- Stats Row -->
+            <div style="display: flex; gap: 24px; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.02); border-radius: 4px;">
+                <div>
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Total PRs</MudText>
+                    <MudText Typo="Typo.h6" Style="color: var(--mud-palette-primary);">@_prChartData.TotalPRs</MudText>
+                </div>
+                @if (_prChartData.AverageReviewTimeHours.HasValue)
+                {
+                    <div>
+                        <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Avg Review Time</MudText>
+                        <MudText Typo="Typo.h6" Style="color: var(--mud-palette-primary);">
+                            @if (_prChartData.AverageReviewTimeHours.Value < 24)
+                            {
+                                @($"{_prChartData.AverageReviewTimeHours.Value:F1}h")
+                            }
+                            else
+                            {
+                                @($"{(_prChartData.AverageReviewTimeHours.Value / 24):F1}d")
+                            }
+                        </MudText>
+                    </div>
+                }
+                <div>
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Date Range</MudText>
+                    <MudText Typo="Typo.body2">@_prChartData.StartDate.ToString("MMM dd") - @_prChartData.EndDate.ToString("MMM dd")</MudText>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <BarChart 
+                Labels="@_prChartData.Labels" 
+                Data="@_prChartData.Values"
+                Title="Pull Requests by Status"
+                Color="rgba(75, 192, 192, 0.8)"
+                BorderColor="rgba(75, 192, 192, 1)" />
+        }
+        else
+        {
+            <div style="text-align: center; padding: 60px; color: var(--mud-palette-text-secondary);">
+                <div style="font-size: 48px; margin-bottom: 16px;">🔀</div>
+                <MudText Typo="Typo.h6">No pull request data available</MudText>
+                <MudText Typo="Typo.body2">Connect GitHub and sync your repositories to see PR statistics</MudText>
+            </div>
+        }
+    </MudPaper>
+
     <!-- Panels Grid -->
     <div class="panel-grid" style="margin-top: 24px;">
         <DataPanel Title="Activity Overview">
@@ -225,6 +311,11 @@ else
     private CommitActivityChartDto? _chartData;
     private bool _isLoadingChart = false;
     private int _selectedDays = 7;
+
+    // PR Chart data - Phase 3.3
+    private PullRequestChartDto? _prChartData;
+    private bool _isLoadingPRChart = false;
+    private int _selectedPRDays = 30;
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
@@ -234,6 +325,7 @@ else
             await CheckGitHubConnectionStatus();
             await LoadRecentCommitsAsync();
             await LoadCommitActivityAsync(7);
+            await LoadPRStatsAsync(30);
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -402,6 +494,30 @@ else
         finally
         {
             _isLoadingChart = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPRStatsAsync(int days)
+    {
+        _selectedPRDays = days;
+        _isLoadingPRChart = true;
+        StateHasChanged();
+
+        try
+        {
+            _prChartData = await ChartDataService.GetPullRequestStatsAsync(
+                days: days,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading PR statistics");
+            Snackbar.Add("Failed to load PR statistics", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingPRChart = false;
             StateHasChanged();
         }
     }
