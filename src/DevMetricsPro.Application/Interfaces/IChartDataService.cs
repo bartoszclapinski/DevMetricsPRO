@@ -20,4 +20,16 @@ public interface IChartDataService
         DateTime startDate,
         DateTime endDate,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get pull request statistics for chart display
+    /// </summary>
+    /// <param name="days">Number of days to look back</param>
+    /// <param name="developerId">Optional developer ID to filter by</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>PR statistics with status breakdown and average review time</returns>
+    Task<PullRequestChartDto> GetPullRequestStatsAsync(
+        int days = 30,
+        Guid? developerId = null,
+        CancellationToken cancellationToken = default);
 }
