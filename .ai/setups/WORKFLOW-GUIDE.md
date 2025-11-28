@@ -9,12 +9,11 @@ This document describes the **issue-driven, guided-implementation** workflow use
 ### 1. **Issue-Driven Development**
 Every feature, phase, or significant change MUST have a GitHub issue created first.
 
-### 2. **AI Guides, User Implements, AI Reviews**
+### 2. **AI Guides, User Implements (or AI Implements with Approval)**
 - The **AI provides guidance** on what needs to be implemented and how
-- The **AI explains** what should be implemented and why
-- The **USER implements** the code in their IDE based on AI guidance
-- The **AI reviews** the user's implementation and provides feedback
-- The **USER learns** by hands-on coding with expert guidance
+- The **AI can implement code** directly with user approval
+- The **USER reviews** implementations and approves changes
+- The **USER tests** locally to verify functionality
 - **Both collaborate** on architecture and design decisions
 
 ### 3. **Learning-First Approach**
@@ -37,7 +36,7 @@ Every feature, phase, or significant change MUST have a GitHub issue created fir
 **ALWAYS start with an issue!**
 
 ```markdown
-Title: Sprint X Phase Y.Z: [Phase Name]
+Title: [SPRINT X] Phase X.X: [Phase Name]
 
 Description:
 - Brief description of what this phase accomplishes
@@ -47,7 +46,7 @@ Description:
 ```
 
 **Example:**
-- Issue #26: Sprint 1 Phase 1.4: Logging & Error Handling
+- Issue #115: [SPRINT 3] Phase 3.3: PR Statistics Bar Chart
 
 ### Step 2: Create Feature Branch
 **ALWAYS work on a feature branch!**
@@ -55,15 +54,15 @@ Description:
 ```bash
 git checkout master
 git pull origin master
-git checkout -b sprint1/phase1.X-feature-name-#IssueNumber
+git checkout -b sprintX/phaseX.X-feature-name-#IssueNumber
 ```
 
 **Naming convention:**
-- `sprintX/phaseY.Z-feature-name-#IssueNumber`
-- Example: `sprint1/phase1.4-logging-error-handling-#26`
+- `sprintX/phaseX.X-feature-name-#IssueNumber`
+- Example: `sprint3/phase3.3-pr-stats-chart-#115`
 
-### Step 3: AI Provides Implementation Guidance
-**AI guides what needs to be implemented:**
+### Step 3: AI Provides Implementation Guidance (or Implements)
+**AI guides or implements with approval:**
 
 ```
 Now let's implement [Feature].
@@ -71,43 +70,35 @@ Now let's implement [Feature].
 You need to create [File] at [path]:
 
 [AI explains what this file does and why]
-[AI provides code structure/examples to implement]
+[AI provides code structure/examples OR implements directly]
 [AI explains the patterns and conventions to follow]
 
-Here's what you need to implement:
+Here's what needs to be implemented:
 [Detailed guidance and code examples]
 
-Please implement this in your IDE and let me know when you're done so I can review!
+Would you like me to implement this, or would you prefer to code it yourself?
 ```
 
-### Step 4: User Implements Code
-**USER implements the code in their IDE:**
+### Step 4: User Reviews and Tests
+**USER reviews and tests the implementation:**
 
 ```
-[User creates/modifies files based on AI guidance]
-[User follows patterns and conventions explained by AI]
-[User asks questions if unclear during implementation]
+[User reviews the code changes]
+[User runs the application locally]
+[User verifies functionality works as expected]
 
-User: I've implemented the code. Please review it!
+User: I've tested it, looks good! / There's an issue with X...
 ```
 
-### Step 5: AI Reviews Implementation
-**AI reviews the user's code and provides feedback:**
-
-```
-[AI reviews the implemented code]
-[AI provides feedback on correctness, patterns, improvements]
-[AI explains any needed adjustments]
-
-Your implementation looks great! / Please adjust X for Y reason.
-Ready to commit? Or would you like to make any changes?
-```
-
-### Step 6: Push Changes
-**AI or User pushes the feature branch:**
+### Step 5: Push Changes
+**Push the feature branch:**
 
 ```bash
-git push origin sprint1/phase1.4-logging-error-handling-#26
+git add .
+git commit -m "feat(scope): description
+
+Closes #IssueNumber"
+git push -u origin sprintX/phaseX.X-feature-name-#IssueNumber
 ```
 
 **Commit message format:**
@@ -115,8 +106,6 @@ git push origin sprint1/phase1.4-logging-error-handling-#26
 <type>(<scope>): <description>
 
 [optional body]
-
-[optional footer with issue reference]
 
 Closes #IssueNumber
 ```
@@ -129,15 +118,15 @@ Closes #IssueNumber
 - `refactor:` - Code refactoring
 - `chore:` - Maintenance tasks
 
-### Step 7: Create Pull Request
+### Step 6: Create Pull Request
 **Title format:**
 ```
-sprintX/phaseY.Z: [Description] - Closes #IssueNumber
+[SPRINT X] Phase X.X: [Description] - Closes #IssueNumber
 ```
 
 **Example:**
 ```
-sprint1/phase1.4: Add Serilog and global exception handler - Closes #26
+[SPRINT 3] Phase 3.3: PR Statistics Bar Chart - Closes #115
 ```
 
 **PR Description:**
@@ -147,7 +136,7 @@ sprint1/phase1.4: Add Serilog and global exception handler - Closes #26
   - [ ] CI checks passing
   - [ ] Tested locally
 
-### Step 8: Merge and Continue
+### Step 7: Merge and Continue
 **After PR approval:**
 
 ```bash
@@ -158,6 +147,14 @@ git pull origin master
 
 # Ready for next phase!
 ```
+
+### Step 8: Update Sprint Log
+**AI updates sprint log with:**
+- What was implemented
+- What was learned
+- Time spent
+- Any challenges solved
+- GitHub issue/branch references
 
 ---
 
@@ -170,24 +167,19 @@ git pull origin master
 4. Plan today's focus
 
 ### During Development (2-3 hours)
-1. **AI guides**: "Let's implement [Feature]..." [provides detailed guidance]
-2. **User implements**: "I'll code this..." [implements in IDE]
-3. **AI reviews**: "Your code looks good, but consider..." [reviews and provides feedback]
+1. **AI guides**: "Let's implement [Feature]..." [provides guidance or implements]
+2. **User reviews**: "I'll test this..." [reviews and tests]
+3. **AI documents**: "Let me update the sprint log..." [updates docs]
 4. **Repeat** for each step in the phase
-5. **User commits** after each working step (with AI approval)
+5. **Commit** after each working step
 
 ### End of Phase
-1. **Run tests**: Verify everything works
+1. **Verify**: Everything works locally
 2. **Update sprint log**: Document learnings
 3. **Commit and push**: Push feature branch
 4. **Create PR**: Link to issue
 5. **Merge**: After CI checks pass
-
-### Evening (5 minutes)
-1. Update sprint log with progress
-2. Note time spent
-3. Document any challenges
-4. Plan tomorrow's focus
+6. **Update master**: Pull latest
 
 ---
 
@@ -201,22 +193,29 @@ git pull origin master
 **Phases completed**:
 - [x] Phase X.Y: [Name] ✅
 
+**What I implemented**:
+- [Component/Feature 1]
+- [Component/Feature 2]
+
 **What I learned**:
 - [Concept 1]: [Explanation]
 - [Concept 2]: [Explanation]
-- [Technical detail]: [Why it's important]
 
 **Time spent**: X hours
 **Blockers**: None / [describe]
-**Notes**: [Additional observations]
+
+**GitHub**:
+- Issue: #XX
+- Branch: `sprintX/phaseX.X-feature-#XX`
+- PR created and merged ✅
 ```
 
 ### Commit Messages
 **ALWAYS use conventional commits:**
 
 ```bash
-feat(auth): add JWT token generation service
-fix(db): resolve migration conflict in Developers table
+feat(charts): add PR statistics bar chart component
+fix(service): resolve null reference in ChartDataService
 docs(readme): update setup instructions
 test(repository): add integration tests for UnitOfWork
 refactor(logging): extract Serilog config to separate class
@@ -240,17 +239,18 @@ chore(deps): update EF Core to version 9.0.0
 ### When Implementing
 **AI does:**
 - Provides detailed guidance on what to implement
-- Explains WHAT should be implemented
+- Can implement code directly with user approval
+- Explains WHAT is being implemented
 - Explains WHY we're doing it
 - Provides context about architecture fit
-- Shows expected code patterns and examples
+- Shows patterns and conventions
 
 **USER:**
-- Implements code in their IDE based on guidance
-- Asks questions when unclear during implementation
-- Shows implementation to AI for review
-- Tests implementation locally
-- Learns by hands-on coding with expert guidance
+- Reviews code changes
+- Tests functionality locally
+- Asks questions when unclear
+- Approves changes for commit
+- Learns by reviewing with expert guidance
 
 ### When Reviewing
 **AI checks:**
@@ -274,39 +274,30 @@ AI answers:
 3. **Example**: How it works in practice
 4. **Context**: Where it fits in our project
 
-**Example:**
-> User: "What is CancellationToken?"
-> 
-> AI: "CancellationToken is a mechanism to cancel long-running operations...
-> [Detailed explanation with examples from our code]"
-
 ---
 
 ## 🚨 Important Rules
 
 ### AI Must NOT
 - ❌ Skip creating GitHub issues
-- ❌ Implement code directly (user implements)
+- ❌ Commit without user approval
 - ❌ Assume user understanding without asking
 - ❌ Rush through explanations
-- ❌ Skip reviewing user's implementations
-- ❌ Provide guidance without explaining WHY
+- ❌ Skip testing verification
 
 ### AI Must ALWAYS
 - ✅ Create GitHub issues first
-- ✅ Provide detailed implementation guidance
-- ✅ Explain what should be implemented and why
-- ✅ Review user's implementations thoroughly
+- ✅ Provide detailed explanations
+- ✅ Ask for approval before committing
 - ✅ Guide on conventional commit messages
 - ✅ Help verify each step works
-- ✅ Update sprint log with user
+- ✅ Update sprint log after phases
 
 ### User Must ALWAYS
-- ✅ Implement code based on AI guidance
-- ✅ Ask questions when unclear during implementation
-- ✅ Show implementations to AI for review before committing
-- ✅ Test locally after implementation
-- ✅ Create PRs for all changes
+- ✅ Review code changes before approving
+- ✅ Test locally after implementations
+- ✅ Ask questions when unclear
+- ✅ Approve commits before pushing
 - ✅ Verify sprint log is updated
 
 ---
@@ -327,7 +318,7 @@ AI answers:
 - Concepts learned
 - Time tracking
 - Blockers and solutions
-- Notes and observations
+- GitHub issue/branch references
 
 ### GitHub Issues
 **Created for**:
@@ -337,14 +328,14 @@ AI answers:
 - Technical debt
 
 **Format**:
-- Clear title with sprint/phase reference
+- Title: `[SPRINT X] Phase X.X: Description`
 - Description with context
 - Tasks list
 - Acceptance criteria
-- Labels: `sprint-X`, `phase-Y.Z`, `enhancement`, etc.
+- Labels: `sprint-X`, `enhancement`, etc.
 
 ### Git Branches
-**Naming**: `sprintX/phaseY.Z-feature-name-#issueNumber`
+**Naming**: `sprintX/phaseX.X-feature-name-#issueNumber`
 
 **Lifecycle**:
 1. Created from `master`
@@ -366,25 +357,24 @@ dotnet ef database update -p src/DevMetricsPro.Infrastructure -s src/DevMetricsP
 
 # Remove last migration
 dotnet ef migrations remove -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
-
-# Drop database (development only!)
-dotnet ef database drop --force -p src/DevMetricsPro.Infrastructure -s src/DevMetricsPro.Web
 ```
 
 ### Common Git Commands
 ```bash
 # Create feature branch
-git checkout -b sprint1/phase1.X-feature-#IssueNumber
+git checkout -b sprint3/phase3.X-feature-#IssueNumber
 
 # Status and add changes
 git status
 git add .
 
 # Commit with conventional commit
-git commit -m "feat(scope): description - Closes #IssueNumber"
+git commit -m "feat(scope): description
+
+Closes #IssueNumber"
 
 # Push feature branch
-git push -u origin sprint1/phase1.X-feature-#IssueNumber
+git push -u origin sprint3/phase3.X-feature-#IssueNumber
 
 # Switch to master and pull latest
 git checkout master
@@ -411,9 +401,8 @@ dotnet build
 # Build specific project
 dotnet build src/DevMetricsPro.Web/
 
-# Clean build
-dotnet clean
-dotnet build
+# Run dev server
+dotnet run --project src/DevMetricsPro.Web
 ```
 
 ---
@@ -422,27 +411,25 @@ dotnet build
 
 Before marking a phase as complete:
 
-- [ ] All code implemented according to guidance
-- [ ] All tests passing locally
+- [ ] All code implemented and working
+- [ ] User has tested locally
 - [ ] Sprint log updated with learnings
 - [ ] Changes committed with conventional commit messages
 - [ ] Feature branch pushed to GitHub
 - [ ] Pull request created and linked to issue
 - [ ] CI checks passing
-- [ ] Code reviewed (by AI)
 - [ ] PR merged to master
 - [ ] Local master branch updated
-- [ ] Feature branch deleted (optional)
 
 ---
 
 ## 🚀 Starting a New Sprint
 
 1. **Read sprint plan**: `.ai/sprints/sprintX/sprint-plan.md`
-2. **Create sprint log**: `.ai/sprints/sprintX/sprint-log.md`
-3. **Review overall plan**: `.ai/sprints/overall-plan.md`
+2. **Review previous sprint**: Check handoff document if exists
+3. **Create sprint log**: Update `.ai/sprints/sprintX/sprint-log.md`
 4. **Create issues**: One for each phase
-5. **Begin Phase 1.1**: Follow workflow above
+5. **Begin Phase 1**: Follow workflow above
 
 ---
 
@@ -462,13 +449,6 @@ Before marking a phase as complete:
 4. **Request analogies** for complex topics
 5. **Document understanding** in sprint log
 
-### Process Questions
-1. **Re-read this workflow guide**
-2. **Check sprint plan** for specific phase instructions
-3. **Review previous phases** for patterns
-4. **Ask AI** for process clarification
-5. **Update workflow guide** if needed
-
 ---
 
 ## ✅ Success Criteria
@@ -477,9 +457,8 @@ This workflow is working well when:
 
 - ✅ Every change has a GitHub issue
 - ✅ All work happens on feature branches
-- ✅ User implements all code with AI guidance
-- ✅ AI reviews user implementations thoroughly
-- ✅ Explanations are clear and helpful
+- ✅ User reviews all code changes
+- ✅ AI explains concepts thoroughly
 - ✅ Sprint log is kept up to date
 - ✅ Conventional commits are used consistently
 - ✅ PRs are small and focused
@@ -505,8 +484,8 @@ This workflow is working well when:
 - `.cursor/testing-rules.mdc` - Testing standards
 
 ### Project Context
-- `.ai/prd.md` - Product requirements
-- `.ai/GETTING-STARTED.md` - Quick start guide
+- `.ai/setups/prd.md` - Product requirements
+- `.ai/setups/GETTING-STARTED.md` - Quick start guide
 - `.ai/sprints/overall-plan.md` - 5-sprint roadmap
 
 ---
@@ -524,9 +503,8 @@ This workflow is working well when:
 
 ---
 
-**Last Updated**: November 4, 2025  
-**Sprint**: Sprint 2 - Phases 2.1-2.4 Complete + UI Redesign Complete ✅  
-**Next Phase**: Phase 2.5 - Hangfire Background Jobs
-
-**Note**: This workflow reflects the **actual practice** where **USER implements code** based on **AI guidance and review**. This approach maximizes learning - user gains hands-on coding experience with expert guidance and feedback, ensuring both skill development and high-quality code.
+**Last Updated**: November 27, 2025  
+**Sprint**: Sprint 3 - Charts & Real-time Dashboard  
+**Status**: Phases 3.1-3.3 Complete ✅  
+**Next Phase**: Phase 3.4 - Contribution Heatmap
 

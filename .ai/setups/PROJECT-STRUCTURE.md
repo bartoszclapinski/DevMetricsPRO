@@ -1,6 +1,6 @@
 # DevMetrics Pro - Project Structure Reference
 
-**Last Updated**: October 31, 2025  
+**Last Updated**: November 27, 2025  
 **Purpose**: Complete project structure to check BEFORE implementing any new features to avoid duplication
 
 ---
@@ -78,13 +78,19 @@ DevMetricsPRO/
 | `DTOs/GitHub/GitHubOAuthResponse.cs` | OAuth response | AccessToken, TokenType, GitHubUsername, GitHubUserId |
 | `DTOs/GitHub/GitHubCallbackRequest.cs` | OAuth callback | Code, State |
 | `DTOs/GitHub/GitHubRepositoryDto.cs` | **✅ REPOSITORY DATA** | Id, Name, Description, HtmlUrl, FullName, IsPrivate, IsFork, StargazersCount, ForksCount, OpenIssuesCount, Language, CreatedAt, UpdatedAt, PushedAt |
-| `DTOs/GitHub/GitHubCommitDto.cs` | **✅ COMMIT DATA** (Phase 2.4) | Sha, Message, AuthorName, AuthorEmail, CommitterName, CommitterEmail, CommittedAt, AuthorDate, HtmlUrl, Additions, Deletions, TotalChanges, RepositoryName |
-| `DTOs/GitHub/GitHubPullRequestDto.cs` | **✅ PULL REQUEST DATA** (Phase 2.6) | Number, Title, State, Body, HtmlUrl, AuthorLogin, AuthorName, CreatedAt, UpdatedAt, ClosedAt, MergedAt, IsMerged, IsDraft, Additions, Deletions, ChangedFiles, RepositoryName |
+| `DTOs/GitHub/GitHubCommitDto.cs` | **✅ COMMIT DATA** | Sha, Message, AuthorName, AuthorEmail, CommitterName, CommitterEmail, CommittedAt, AuthorDate, HtmlUrl, Additions, Deletions, TotalChanges, RepositoryName |
+| `DTOs/GitHub/GitHubPullRequestDto.cs` | **✅ PULL REQUEST DATA** | Number, Title, State, Body, HtmlUrl, AuthorLogin, AuthorName, CreatedAt, UpdatedAt, ClosedAt, MergedAt, IsMerged, IsDraft, Additions, Deletions, ChangedFiles, RepositoryName |
+
+### DTOs - Charts (NEW - Sprint 3!) 📊
+
+| File | Purpose | Properties |
+|------|---------|------------|
+| `DTOs/Charts/CommitActivityChartDto.cs` | **✅ COMMIT CHART DATA** | Labels, Values, TotalCommits, AveragePerDay, StartDate, EndDate |
+| `DTOs/Charts/PullRequestChartDto.cs` | **✅ PR CHART DATA** | Labels, Values, TotalPRs, AverageReviewTimeHours, StartDate, EndDate |
 
 **⚠️ IMPORTANT**: 
-- `GitHubRepositoryDto` is the **ONLY** repository DTO. Use this for all UI and API interactions!
-- `GitHubCommitDto` is the **ONLY** commit DTO. Use this for all commit-related UI and API interactions!
-- `GitHubPullRequestDto` is the **ONLY** PR DTO. Use this for all PR-related UI and API interactions!
+- Use existing DTOs for all UI and API interactions!
+- Check this list BEFORE creating new DTOs!
 
 ### Service Interfaces
 
@@ -93,9 +99,16 @@ DevMetricsPRO/
 | `Interfaces/IJwtService.cs` | `GenerateToken()`, `GenerateRefreshToken()` | JWT token generation |
 | `Interfaces/IGitHubOAuthService.cs` | `GetAuthorizationUrl()`, `ExchangeCodeForTokenAsync()` | GitHub OAuth flow |
 | `Interfaces/IGitHubRepositoryService.cs` | `GetUserRepositoriesAsync()` | Fetch repos from GitHub API |
-| `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API (Phase 2.4) ✅ |
-| `Interfaces/IGitHubPullRequestService.cs` | `GetRepositoryPullRequestsAsync()` | Fetch PRs from GitHub API (Phase 2.6) ✅ |
-| `Interfaces/IMetricsCalculationService.cs` | `CalculateMetricsForDeveloperAsync()`, `CalculateMetricsForAllDevelopersAsync()` | Calculate developer metrics (Phase 2.7) ✅ |
+| `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API |
+| `Interfaces/IGitHubPullRequestService.cs` | `GetRepositoryPullRequestsAsync()` | Fetch PRs from GitHub API |
+| `Interfaces/IMetricsCalculationService.cs` | `CalculateMetricsForDeveloperAsync()`, `CalculateMetricsForAllDevelopersAsync()` | Calculate developer metrics |
+| `Interfaces/IChartDataService.cs` | `GetCommitActivityAsync()`, `GetPullRequestStatsAsync()` | **✅ NEW!** Chart data aggregation |
+
+### Services (Application Layer)
+
+| File | Implements | Description |
+|------|------------|-------------|
+| `Services/ChartDataService.cs` | `IChartDataService` | **✅ NEW!** Aggregates data for charts |
 
 ---
 
@@ -128,16 +141,16 @@ DevMetricsPRO/
 | `Repositories/Repository.cs` | Generic repository pattern (IRepository<T>) |
 | `Repositories/UnitOfWork.cs` | Unit of Work pattern (IUnitOfWork) |
 
-### Services
+### Services (Infrastructure Layer)
 
 | File | Implements | Description |
 |------|------------|-------------|
 | `Services/JwtService.cs` | `IJwtService` | JWT token generation with claims |
 | `Services/GitHubOAuthService.cs` | `IGitHubOAuthService` | GitHub OAuth token exchange |
 | `Services/GitHubRepositoryService.cs` | `IGitHubRepositoryService` | Fetch repos using Octokit.NET |
-| `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET (Phase 2.4) ✅ |
-| `Services/GitHubPullRequestService.cs` | `IGitHubPullRequestService` | Fetch PRs using Octokit.NET (Phase 2.6) ✅ |
-| `Services/MetricsCalculationService.cs` | `IMetricsCalculationService` | Calculate 5 developer metrics from commits/PRs (Phase 2.7) ✅ |
+| `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET |
+| `Services/GitHubPullRequestService.cs` | `IGitHubPullRequestService` | Fetch PRs using Octokit.NET |
+| `Services/MetricsCalculationService.cs` | `IMetricsCalculationService` | Calculate 5 developer metrics from commits/PRs |
 
 ### Migrations
 
@@ -160,7 +173,7 @@ DevMetricsPRO/
 | File | Routes | Description |
 |------|--------|-------------|
 | `Controllers/AuthController.cs` | `/api/auth/register`, `/api/auth/login` | Authentication API |
-| `Controllers/GitHubController.cs` | `/api/github/authorize`, `/api/github/callback`, `/api/github/status`, `/api/github/sync-repositories` | GitHub integration API |
+| `Controllers/GitHubController.cs` | `/api/github/*` | GitHub integration API |
 
 **Available API Endpoints:**
 - ✅ `POST /api/auth/register` - Register new user
@@ -169,35 +182,36 @@ DevMetricsPRO/
 - ✅ `GET /api/github/callback` - OAuth callback
 - ✅ `GET /api/github/status` - Check GitHub connection
 - ✅ `POST /api/github/sync-repositories` - Sync repos from GitHub
-- ✅ `POST /api/github/commits/sync/{repositoryId}` - Sync commits for repository (Phase 2.4) ✅
-- ✅ `GET /api/github/commits/recent?limit=10` - Get recent commits (Phase 2.4) ✅
-- ✅ `POST /api/github/pull-requests/sync/{repositoryId}` - Sync PRs for repository (Phase 2.6) ✅
-- ✅ `GET /api/github/pull-requests?repositoryId={guid}&status={all|open|closed|merged}` - Get PRs from database (Phase 2.6.5) ✅
-- ✅ `POST /api/github/sync-all` - Trigger full sync background job (Phase 2.5) ✅
+- ✅ `POST /api/github/commits/sync/{repositoryId}` - Sync commits for repository
+- ✅ `GET /api/github/commits/recent?limit=10` - Get recent commits
+- ✅ `POST /api/github/pull-requests/sync/{repositoryId}` - Sync PRs for repository
+- ✅ `GET /api/github/pull-requests?repositoryId={guid}&status={all|open|closed|merged}` - Get PRs from database
+- ✅ `POST /api/github/sync-all` - Trigger full sync background job
 
 ### Blazor Pages
 
 | File | Route | Purpose | Status |
 |------|-------|---------|--------|
-| `Components/Pages/Home.razor` | `/` | Dashboard with stats and GitHub connection | ✅ Working (Redesigned) |
+| `Components/Pages/Home.razor` | `/` | Dashboard with charts and GitHub connection | ✅ Working (Charts added!) |
 | `Components/Pages/Login.razor` | `/login` | User login | ✅ Working |
 | `Components/Pages/Register.razor` | `/register` | User registration | ✅ Working |
-| `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36 repos) | ✅ Working (Redesigned) |
-| `Components/Pages/PullRequests.razor` | `/pull-requests` | Display PRs with filtering (repo, status) | ✅ Working (Phase 2.6.5) |
+| `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36+ repos) | ✅ Working |
+| `Components/Pages/PullRequests.razor` | `/pull-requests` | Display PRs with filtering (repo, status) | ✅ Working |
 | `Components/Pages/Test.razor` | `/test` | Test page for development | ✅ Working |
 | `Components/Pages/Weather.razor` | `/weather` | Demo page | ✅ Working |
 | `Components/Pages/Counter.razor` | `/counter` | Demo page | ✅ Working |
 | `Components/Pages/Error.razor` | `/error` | Error page | ✅ Working |
 
-### Layout Components (NEW - Sprint 2)
+### Layout Components
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `Components/Layout/MainLayout.razor` | Main app layout wrapper | ✅ Working (Redesigned) |
+| `Components/Layout/MainLayout.razor` | Main app layout wrapper | ✅ Working |
 | `Components/Layout/TopNav.razor` | Horizontal navigation bar with tabs | ✅ Working |
 | `Components/Layout/ControlPanel.razor` | Filters and action buttons | ✅ Working |
+| `Components/Layout/NavMenu.razor` | Legacy navigation menu | ✅ Working |
 
-### Shared/Reusable Components (NEW - Sprint 2)
+### Shared/Reusable Components
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -206,20 +220,38 @@ DevMetricsPRO/
 | `Components/Shared/DataTable.razor` | Generic table component with templates | ✅ Working |
 | `Components/Shared/StatusBadge.razor` | Colored status indicators | ✅ Working |
 
-### Stylesheets (NEW - Sprint 2)
+### Chart Components (NEW - Sprint 3!) 📊
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `Components/Shared/Charts/LineChart.razor` | **✅ NEW!** Reusable line chart (Chart.js) | ✅ Working |
+| `Components/Shared/Charts/LineChart.razor.css` | Scoped CSS for line chart | ✅ Working |
+| `Components/Shared/Charts/BarChart.razor` | **✅ NEW!** Reusable bar chart (Chart.js) | ✅ Working |
+| `Components/Shared/Charts/BarChart.razor.css` | Scoped CSS for bar chart | ✅ Working |
+
+### JavaScript Files (NEW - Sprint 3!) 📊
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `wwwroot/js/charts.js` | **✅ NEW!** Chart.js JSInterop wrapper | ✅ Working |
+
+**Chart.js Functions:**
+- `chartHelpers.createLineChart(canvasId, config)` - Create line chart
+- `chartHelpers.createBarChart(canvasId, config)` - Create bar chart
+- `chartHelpers.updateChart(canvasId, newData)` - Update chart data
+- `chartHelpers.destroyChart(canvasId)` - Clean up chart instance
+
+### Stylesheets
 
 | File | Purpose | Status |
 |------|---------|--------|
 | `wwwroot/css/design-system.css` | Design tokens, color palette, core styles | ✅ Complete |
 
-**📝 Note**: `/developers`, `/metrics`, `/settings` pages not yet created
-
 ### Other Layout Files
 
 | File | Purpose |
 |------|---------|
-| `Components/Layout/NavMenu.razor` | Legacy navigation menu (may be removed) |
-| `Components/App.razor` | Root Blazor app component |
+| `Components/App.razor` | Root Blazor app component (includes Chart.js CDN) |
 | `Components/Routes.razor` | Route configuration |
 | `Components/_Imports.razor` | Global using statements for components |
 
@@ -229,7 +261,7 @@ DevMetricsPRO/
 |------|---------|
 | `Services/AuthStateService.cs` | Manages JWT token in localStorage, checks authentication state |
 
-### Background Jobs (Phase 2.5)
+### Background Jobs
 
 | File | Purpose | Status |
 |------|---------|--------|
@@ -249,7 +281,7 @@ DevMetricsPRO/
 | File | Purpose |
 |------|---------|
 | `Middleware/GlobalExceptionHandler.cs` | Global exception handling with logging |
-| `Middleware/HangfireAuthorizationFilter.cs` | Hangfire dashboard authorization (DEBUG: open, RELEASE: auth required) |
+| `Middleware/HangfireAuthorizationFilter.cs` | Hangfire dashboard authorization |
 
 ---
 
@@ -269,31 +301,35 @@ DevMetricsPRO/
 - [x] Logging with Serilog
 - [x] Global exception handling
 
-### 🚧 In Progress (Sprint 2)
+### ✅ Completed (Sprint 2)
 
 - [x] Phase 2.1: GitHub OAuth integration ✅
 - [x] Phase 2.2: Store GitHub tokens in database ✅
-- [x] Phase 2.3: GitHub repositories sync (backend) ✅
-- [x] Phase 2.3.3: Repositories UI page ✅
+- [x] Phase 2.3: GitHub repositories sync ✅
 - [x] Phase 2.4: Commits sync ✅
 - [x] Phase 2.5: Hangfire setup ✅
 - [x] Phase 2.6: Pull requests sync ✅
-  - [x] Phase 2.6.1: PR DTOs & Interface ✅
-  - [x] Phase 2.6.2: PR Service Implementation ✅
-  - [x] Phase 2.6.3: PR API Endpoint ✅
-  - [x] Phase 2.6.4: PR Background Job Integration ✅
-- [ ] Phase 2.7: Basic metrics calculation (Next!)
+- [x] Phase 2.7: Basic metrics calculation ✅
+- [x] UI Redesign: Professional design system ✅
+
+### 🏃 In Progress (Sprint 3 - Charts & Real-time)
+
+- [x] Phase 3.1: Chart Library Setup ✅ (Chart.js via JSInterop)
+- [x] Phase 3.2: Commit Activity Chart ✅ (Line chart with real data!)
+- [x] Phase 3.3: PR Statistics Bar Chart ✅ (Bar chart with status breakdown)
+- [ ] Phase 3.4: Contribution Heatmap (NEXT!)
+- [ ] Phase 3.5: Team Leaderboard
+- [ ] Phase 3.6-3.7: SignalR Real-time Updates
+- [ ] Phase 3.8-3.10: Advanced Features & Polish
 
 ### ⏭️ Not Started
 
 - Developers page (`/developers`)
 - Metrics page (`/metrics`)
 - Settings page (`/settings`)
-- Pull Requests UI page (`/pull-requests`)
-- Metrics calculation service
-- Redis caching (Phase 2.8)
-- Dashboard charts (ApexCharts) (Sprint 3)
-- SignalR real-time updates (Sprint 3)
+- Contribution Heatmap component
+- SignalR real-time updates
+- Advanced analytics
 
 ---
 
@@ -303,32 +339,45 @@ DevMetricsPRO/
 
 **DTOs:**
 - ✅ `GitHubRepositoryDto` - Use for ALL repository data
+- ✅ `GitHubCommitDto` - Use for commit data
+- ✅ `GitHubPullRequestDto` - Use for PR data
+- ✅ `CommitActivityChartDto` - Use for commit charts
+- ✅ `PullRequestChartDto` - Use for PR charts
 - ✅ `LoginRequest`, `RegisterRequest`, `AuthResponse` - Use for auth
-- ✅ `GitHubOAuthRequest`, `GitHubOAuthResponse` - Use for OAuth
 
 **Services:**
+- ✅ `IChartDataService` - Use for chart data aggregation
 - ✅ `IGitHubRepositoryService` - Use for fetching repos
+- ✅ `IGitHubCommitsService` - Use for fetching commits
+- ✅ `IGitHubPullRequestService` - Use for fetching PRs
 - ✅ `IGitHubOAuthService` - Use for OAuth flow
 - ✅ `IJwtService` - Use for JWT tokens
 - ✅ `AuthStateService` - Use for client-side auth state
+
+**Components:**
+- ✅ `LineChart.razor` - Use for line charts
+- ✅ `BarChart.razor` - Use for bar charts
+- ✅ `MetricCard.razor` - Use for metric display
+- ✅ `DataPanel.razor` - Use for panel containers
+- ✅ `DataTable.razor` - Use for tables
 
 **Entities:**
 - ✅ All 7 entities exist (Developer, Repository, Commit, PullRequest, Metric, ApplicationUser, BaseEntity)
 
 ### ✅ OK TO CREATE:
 
-**Services (not yet implemented):**
-- `IMetricsCalculationService` - For Phase 2.7
+**Components (not yet implemented):**
+- `ContributionHeatmap.razor` - For Phase 3.4
+- `Leaderboard.razor` - For Phase 3.5
+
+**DTOs (not yet implemented):**
+- `ContributionHeatmapDto` - For Phase 3.4
+- `LeaderboardEntryDto` - For Phase 3.5
 
 **Pages (not yet implemented):**
 - `Developers.razor` - Display developers list
-- `PullRequests.razor` - Display synced PRs
 - `Metrics.razor` - Display metrics charts
 - `Settings.razor` - User settings
-
-**UI Response Wrappers:**
-- Internal classes in `.razor` files for API responses (not business DTOs)
-- Example: `SyncRepositoriesResponse`, `GitHubStatusResponse`
 
 ---
 
@@ -337,6 +386,7 @@ DevMetricsPRO/
 ### Step 1: Check This Document
 - ✅ Does a DTO already exist for this data?
 - ✅ Does a service interface already exist?
+- ✅ Does a component already exist?
 - ✅ Does a page already exist at this route?
 - ✅ Does an entity already exist in Core?
 
@@ -344,18 +394,15 @@ DevMetricsPRO/
 ```bash
 ls src/DevMetricsPro.Application/DTOs/
 ls src/DevMetricsPro.Application/Interfaces/
+ls src/DevMetricsPro.Application/Services/
 ```
 
-### Step 3: Check Infrastructure Layer
-```bash
-ls src/DevMetricsPro.Infrastructure/Services/
-```
-
-### Step 4: Check Web Layer
+### Step 3: Check Web Layer
 ```bash
 ls src/DevMetricsPro.Web/Components/Pages/
+ls src/DevMetricsPro.Web/Components/Shared/
+ls src/DevMetricsPro.Web/Components/Shared/Charts/
 ls src/DevMetricsPro.Web/Controllers/
-ls src/DevMetricsPro.Web/Services/
 ```
 
 ---
@@ -386,58 +433,63 @@ Web (depends on Infrastructure + Application + Core)
 
 ## 💡 Common Patterns
 
-### API Controller Pattern
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-[Authorize(AuthenticationSchemes = "Bearer")]
-public class MyController : ControllerBase
-{
-    private readonly IMyService _service;
-    private readonly ILogger<MyController> _logger;
-    
-    // Constructor injection
-    // Methods with [HttpGet], [HttpPost], etc.
-}
-```
-
-### Blazor Page Pattern
+### Chart Component Pattern (NEW!)
 ```razor
-@page "/mypage"
-@using DevMetricsPro.Application.DTOs.MyDtos
-@inject HttpClient Http
-@inject AuthStateService AuthState
-@inject NavigationManager Navigation
-@inject ILogger<MyPage> Logger
-@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 
-<PageTitle>My Page</PageTitle>
-
-<!-- UI -->
+<div class="chart-container">
+    <canvas id="@CanvasId"></canvas>
+</div>
 
 @code {
-    // State
-    // OnInitializedAsync()
-    // Methods
+    [Parameter, EditorRequired]
+    public required List<string> Labels { get; set; }
+
+    [Parameter, EditorRequired]
+    public required List<int> Data { get; set; }
+
+    private string CanvasId => $"chart-{Guid.NewGuid():N}"[..12];
+    private bool _chartCreated = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("chartHelpers.createLineChart", CanvasId, config);
+            _chartCreated = true;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_chartCreated)
+            await JS.InvokeVoidAsync("chartHelpers.destroyChart", CanvasId);
+    }
 }
 ```
 
-### Service Pattern
+### Chart Data Service Pattern
 ```csharp
-public class MyService : IMyService
+public class ChartDataService : IChartDataService
 {
-    private readonly ILogger<MyService> _logger;
-    
-    public MyService(ILogger<MyService> logger)
-    {
-        _logger = logger;
-    }
-    
-    public async Task<Result> DoSomethingAsync(
-        string param, 
+    private readonly IUnitOfWork _unitOfWork;
+
+    public async Task<CommitActivityChartDto> GetCommitActivityAsync(
+        Guid? developerId,
+        DateTime startDate,
+        DateTime endDate,
         CancellationToken cancellationToken = default)
     {
-        // Implementation
+        var commits = await _unitOfWork.Repository<Commit>()
+            .Query()
+            .AsNoTracking()
+            .Where(c => c.CommittedAt >= startDate && c.CommittedAt <= endDate)
+            .GroupBy(c => c.CommittedAt.Date)
+            .Select(g => new { Date = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        
+        // Transform and return DTO...
     }
 }
 ```
@@ -448,16 +500,16 @@ public class MyService : IMyService
 
 1. **DTOs**: Does Application layer have this DTO already?
 2. **Services**: Does an interface exist in Application/Interfaces?
-3. **Pages**: Check `NavMenu.razor` - is the route already defined?
-4. **Entities**: All 7 core entities exist - do I need a new one?
-5. **Controllers**: Does a controller for this resource exist?
+3. **Components**: Does a similar component exist in Shared/Charts?
+4. **Pages**: Check routes - is the page already defined?
+5. **Entities**: All 7 core entities exist - do I need a new one?
+6. **Controllers**: Does a controller for this resource exist?
 
 ---
 
-**Last Updated**: November 11, 2025 (Post Phase 2.6)  
-**Current Sprint**: Sprint 2 - GitHub Integration  
-**Current Phase**: Phase 2.7 - Basic Metrics Calculation (Next)  
-**Progress**: Week 2 In Progress - 6/8 phases done (75%)  
-**Next Review**: After Sprint 2 completion
-
+**Last Updated**: November 27, 2025 (Post Phase 3.3)  
+**Current Sprint**: Sprint 3 - Charts & Real-time Dashboard  
+**Current Phase**: Phase 3.4 - Contribution Heatmap (Next)  
+**Progress**: 3/10 phases done (30%)  
+**Next Review**: After Sprint 3 completion
 
