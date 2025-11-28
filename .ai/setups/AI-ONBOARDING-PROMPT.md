@@ -13,18 +13,17 @@ Hi! I need your help continuing development on DevMetrics Pro, a real-time devel
 
 Before we start, please read these files IN THIS ORDER to understand the project:
 
-1. **Project Overview & Tech Stack**:
-   - Read `.ai/prd.md` - Product Requirements Document
+1. **Current Sprint Status**:
+   - Read `.ai/sprints/sprint3/sprint-log.md` - What's been done so far
+   - Read `.ai/sprints/sprint3/sprint-plan.md` - Current sprint plan
+
+2. **Project Overview & Tech Stack**:
+   - Read `.ai/setups/prd.md` - Product Requirements Document
    - Read `README.md` - Quick project overview
 
-2. **Current Sprint Status**:
-   - Read `.ai/sprints/sprint1/sprint-plan.md` - Current sprint plan
-   - Read `.ai/sprints/sprint1/sprint-log.md` - What's been done so far
-   - Check the "Sprint Success Criteria" section to see completed phases
-
 3. **Development Workflow**:
-   - Read `.ai/WORKFLOW-GUIDE.md` - HOW we work together
-   - Read `.ai/DOCUMENTATION-STATUS.md` - Documentation status
+   - Read `.ai/setups/WORKFLOW-GUIDE.md` - HOW we work together
+   - Read `.ai/setups/PROJECT-STRUCTURE.md` - What exists in codebase
 
 4. **Architecture & Conventions**:
    - Read `.cursor/rules.md` - Core principles and quick reference
@@ -50,21 +49,20 @@ Let's continue building! 🚀
 After the AI reads those files, it should:
 
 ### 1. **Understand Current State**
+- ✅ Know **Sprint 1** is **COMPLETE** (Authentication) ✅
 - ✅ Know **Sprint 2** is **COMPLETE** (GitHub Integration & Background Jobs) ✅
-- ✅ Know **ALL Sprint 2 phases** are done:
-  - Phase 2.1-2.3: GitHub OAuth & Data Sync ✅
-  - Phase 2.4: Commits Sync (4 sub-phases) ✅
-  - Phase 2.5: Background Jobs (Hangfire) ✅
-  - Phase 2.6: Pull Requests Sync (5 sub-phases) ✅
-  - Phase 2.7: Metrics Calculation (2 sub-phases) ✅
-  - UI Redesign (4 parts) ✅
-- ✅ Know the **next sprint** is **Sprint 3** (Real-time Dashboard & Analytics)
-- ✅ Understand **Sprint 1** is fully complete (Authentication working)
+- ✅ Know **Sprint 3** is **IN PROGRESS** (Charts & Real-time Dashboard)
+  - Phase 3.1: Chart Library Setup ✅
+  - Phase 3.2: Commit Activity Chart ✅
+  - Phase 3.3: PR Statistics Bar Chart ✅
+  - Phase 3.4: Contribution Heatmap (NEXT)
+  - Phase 3.5-3.10: Remaining features
+- ✅ Know the **next phase** is **Phase 3.4** (Contribution Heatmap)
 
 ### 2. **Understand the Workflow**
 - ✅ **AI provides guidance** on what to implement and how
-- ✅ **User implements code** in their IDE based on AI guidance
-- ✅ **AI reviews user's implementation** and provides feedback
+- ✅ **AI can implement code** with user approval
+- ✅ **User reviews** implementations and approves changes
 - ✅ **Issue-driven development**: Create GitHub issue → branch → implement → PR → merge
 - ✅ **Learning mode**: Explain concepts, teach as we go
 - ✅ **Documentation**: Keep sprint log updated with learnings
@@ -77,6 +75,7 @@ After the AI reads those files, it should:
 - Redis 7
 - Entity Framework Core 9
 - MudBlazor for UI
+- **Chart.js** for visualizations (via JSInterop)
 - Hangfire for background jobs
 
 ### 4. **Follow the Architecture**
@@ -105,13 +104,18 @@ Core ← Application ← Infrastructure
 ### Documentation (Read First!)
 ```
 .ai/
-├── prd.md                           # Product requirements
-├── WORKFLOW-GUIDE.md                # HOW we work
-├── DOCUMENTATION-STATUS.md          # Current status
+├── setups/
+│   ├── prd.md                    # Product requirements
+│   ├── WORKFLOW-GUIDE.md         # HOW we work
+│   ├── PROJECT-STRUCTURE.md      # Complete codebase map
+│   └── AI-QUICKSTART.md          # 5-minute quick start
 └── sprints/
-    └── sprint1/
-        ├── sprint-plan.md           # Current sprint plan
-        └── sprint-log.md            # Daily progress log
+    ├── sprint1/                  # Completed ✅
+    ├── sprint2/                  # Completed ✅
+    │   └── SPRINT2-HANDOFF.md   # Handoff document
+    └── sprint3/                  # CURRENT 🚀
+        ├── sprint-plan.md        # Current sprint plan
+        └── sprint-log.md         # Daily progress ← READ THIS!
 ```
 
 ### Code Structure
@@ -119,13 +123,19 @@ Core ← Application ← Infrastructure
 src/
 ├── DevMetricsPro.Core/              # Domain entities, interfaces
 ├── DevMetricsPro.Application/       # Business logic, DTOs, services
+│   ├── DTOs/Charts/                 # Chart DTOs (NEW!)
+│   ├── Interfaces/                  # Service interfaces
+│   └── Services/                    # ChartDataService (NEW!)
 ├── DevMetricsPro.Infrastructure/    # Data access, repositories, EF Core
-└── DevMetricsPro.Web/               # Blazor UI, API controllers, SignalR hubs
+└── DevMetricsPro.Web/               # Blazor UI, API controllers
     ├── Components/
-    │   ├── Pages/                   # Blazor pages (Login, Register, Home)
-    │   └── Layout/                  # MainLayout, NavMenu
-    ├── Controllers/                 # API endpoints (AuthController)
-    └── Services/                    # Client-side services (AuthStateService)
+    │   ├── Pages/                   # Home, Login, Register, etc.
+    │   ├── Layout/                  # MainLayout, TopNav
+    │   └── Shared/
+    │       └── Charts/              # LineChart, BarChart (NEW!)
+    ├── Controllers/                 # API endpoints
+    ├── Jobs/                        # Hangfire background jobs
+    └── wwwroot/js/charts.js         # Chart.js JSInterop wrapper (NEW!)
 ```
 
 ### Helper Scripts
@@ -140,34 +150,28 @@ src/
 
 ---
 
-## 🚀 What to Do Next (Phase 2.7 - Basic Metrics Calculation)
+## 🚀 What to Do Next (Phase 3.4 - Contribution Heatmap)
 
-Based on `sprint-log.md`, the next phase is **Phase 2.7: Basic Metrics Calculation**:
+Based on `sprint-log.md`, the next phase is **Phase 3.4: Contribution Heatmap**:
 
-1. **Create Metrics Service**
-   - IMetricsCalculationService interface
-   - Calculate basic metrics per developer:
-     - Total commits
-     - Lines added/removed
-     - Pull requests (opened, merged)
-     - Active days
-     - Average commit size
+1. **Create Heatmap Data Service**
+   - Add `GetContributionHeatmapAsync()` to `IChartDataService`
+   - Create `ContributionHeatmapDto` DTO
+   - Query commits grouped by date
 
-2. **Store Metrics in Database**
-   - Use existing Metric entity
-   - Store MetricType and Value
-   - Link to Developer and date range
-   - Support historical data
+2. **Build CSS-only Heatmap Component**
+   - Create `ContributionHeatmap.razor` component
+   - Use CSS Grid (7 columns for days of week)
+   - Color intensity based on commit count
+   - GitHub-style appearance
 
-3. **Calculate Metrics in Background Job**
-   - Add metrics calculation to SyncGitHubDataJob
-   - Run after data sync completes
-   - Update existing metrics or create new
+3. **Add Tooltips**
+   - Show date and commit count on hover
+   - Smooth hover transitions
 
-4. **Test Metrics Calculation**
-   - Verify metrics stored correctly
-   - Check calculations are accurate
-   - View metrics in database
+4. **Integrate into Dashboard**
+   - Add to Home.razor or create DeveloperProfile page
+   - Add date range selector (52 weeks default)
 
 ---
 
@@ -178,7 +182,7 @@ Based on `sprint-log.md`, the next phase is **Phase 2.7: Basic Metrics Calculati
 - ✅ **Create GitHub issue** before each phase
 - ✅ **Create feature branch** from master (never commit to master)
 - ✅ **Provide detailed guidance** - User is learning Blazor/.NET
-- ✅ **Review user implementations** thoroughly
+- ✅ **Can implement code** with user approval
 - ✅ **Update sprint log** after completing work
 - ✅ **Use read tools** - Read files, search codebase, understand context
 
@@ -186,7 +190,6 @@ Based on `sprint-log.md`, the next phase is **Phase 2.7: Basic Metrics Calculati
 - ❌ **Don't skip reading documentation** - Critical context!
 - ❌ **Don't commit to master** - Always use feature branch
 - ❌ **Don't guess** - If unsure, ask user or search codebase
-- ❌ **Don't implement code directly** - User implements with your guidance
 - ❌ **Don't forget to update sprint log** - Continuity is key
 - ❌ **Don't skip testing** - Verify changes work
 
@@ -249,37 +252,34 @@ dotnet test
 
 ## 📊 Current Sprint Status
 
-**Sprint**: Sprint 2 - GitHub Integration & Background Jobs  
-**Progress**: ~80% Complete (Week 2 in progress!)  
-**Next**: Phase 2.7 - Basic Metrics Calculation
+**Sprint**: Sprint 3 - Charts & Real-time Dashboard  
+**Progress**: ~30% Complete (Phases 3.1-3.3 done!)  
+**Next**: Phase 3.4 - Contribution Heatmap
 
 ### ✅ Sprint 1 - Complete:
-- Phase 1.1: Core entities (Developer, Repository, Commit, PR, Metric)
-- Phase 1.2: ASP.NET Core Identity integration
-- Phase 1.3: JWT authentication service
-- Phase 1.6: Seed script for default roles/admin user
-- Phase 1.7: Auth API endpoints (Register, Login)
-- Phase 1.8: Blazor AuthStateService (localStorage management)
-- Phase 1.9: Blazor UI (Login, Register, Home pages, MainLayout update)
+- Core entities (Developer, Repository, Commit, PR, Metric)
+- ASP.NET Core Identity + JWT authentication
+- Auth API endpoints (Register, Login)
+- Blazor UI (Login, Register, Home pages)
 
-### ✅ Sprint 2 Week 1 - Complete:
-- Phase 2.1: GitHub OAuth integration
-- Phase 2.2: GitHub token storage
-- Phase 2.3: GitHub repository sync (36 repos synced!)
-- Phase 2.4: GitHub commits sync (working perfectly!)
-- **UI Redesign**: Professional design system (all 4 parts done!)
+### ✅ Sprint 2 - Complete:
+- GitHub OAuth integration
+- GitHub token storage
+- Repository sync (36+ repos synced!)
+- Commits sync (incremental updates)
+- Pull Requests sync
+- Hangfire background jobs
+- Metrics calculation service
+- Professional UI redesign
 
-### ✅ Sprint 2 Week 2 - In Progress:
-- Phase 2.5: Hangfire Setup ✅ (background jobs working!)
-- Phase 2.6: Pull Requests Sync ✅ (all 4 sub-phases complete!)
-  - 2.6.1: PR DTOs & Interface ✅
-  - 2.6.2: PR Service Implementation ✅
-  - 2.6.3: PR API Endpoint ✅
-  - 2.6.4: Background Job Integration ✅
-
-### 🎯 Sprint 2 Remaining:
-- Phase 2.7: Basic Metrics Calculation
-- Phase 2.8: Week 2 Wrap-up
+### 🏃 Sprint 3 - In Progress:
+- ✅ Phase 3.1: Chart Library Setup (Chart.js via JSInterop)
+- ✅ Phase 3.2: Commit Activity Chart (line chart with real data!)
+- ✅ Phase 3.3: PR Statistics Bar Chart
+- ⏳ Phase 3.4: Contribution Heatmap (NEXT)
+- ⏳ Phase 3.5: Team Leaderboard
+- ⏳ Phase 3.6-3.7: SignalR Real-time Updates
+- ⏳ Phase 3.8-3.10: Advanced Metrics & Polish
 
 ---
 
@@ -292,6 +292,7 @@ Before starting work, verify:
 3. ✅ **Solution builds**: `dotnet build` succeeds
 4. ✅ **Dev server works**: Can access `https://localhost:5234`
 5. ✅ **Auth works**: Can register and login
+6. ✅ **Charts work**: Dashboard shows commit and PR charts
 
 ---
 
@@ -334,15 +335,15 @@ You'll know you're on the right track when:
 
 Once you've read the required files and understand the project status, you should:
 
-1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 2, Phases 2.1-2.6 complete (OAuth, repos, commits, Hangfire, PRs all working!). Next is Phase 2.7 (Basic Metrics Calculation)."
-2. **Summarize status**: "GitHub integration fully working. Background jobs sync repos, commits, and PRs automatically. Professional UI redesign complete. Dashboard shows real GitHub data."
-3. **Ask for direction**: "Would you like to continue with Phase 2.7 (Metrics), or work on something else?"
+1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 3, Phases 3.1-3.3 complete (Chart.js setup, Commit Activity Chart, PR Statistics Bar Chart). Next is Phase 3.4 (Contribution Heatmap)."
+2. **Summarize status**: "Dashboard now shows real GitHub data in interactive charts. Line chart for commits, bar chart for PRs. Time range selectors working."
+3. **Ask for direction**: "Would you like to continue with Phase 3.4 (Contribution Heatmap), or work on something else?"
 
 Let's build something great! 🎉
 
 ---
 
-**Last Updated**: November 11, 2025  
-**Sprint**: Sprint 2, ~80% Complete (Phase 2.6 done!)  
-**Version**: 3.0
+**Last Updated**: November 27, 2025  
+**Sprint**: Sprint 3, ~30% Complete (Phases 3.1-3.3 done!)  
+**Version**: 4.0
 
