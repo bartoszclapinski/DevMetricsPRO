@@ -1,0 +1,249 @@
+/* Contribution Heatmap - GitHub-style */
+
+.heatmap-container {
+    background: var(--surface-primary, #1a1a2e);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-primary, #2d2d44);
+}
+
+/* Loading State */
+.heatmap-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem;
+    color: var(--text-secondary, #a0a0b0);
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-primary, #2d2d44);
+    border-top-color: var(--accent-primary, #00d4ff);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.heatmap-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem;
+    color: var(--text-secondary, #a0a0b0);
+}
+
+.empty-icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+/* Header */
+.heatmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.heatmap-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #ffffff);
+}
+
+.heatmap-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent-primary, #00d4ff);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #a0a0b0);
+}
+
+/* Content */
+.heatmap-content {
+    overflow-x: auto;
+}
+
+/* Month Labels */
+.month-labels {
+    display: grid;
+    gap: 0;
+    margin-left: 32px;
+    margin-bottom: 4px;
+    font-size: 0.65rem;
+    color: var(--text-secondary, #a0a0b0);
+    min-height: 14px;
+}
+
+.month-label {
+    white-space: nowrap;
+}
+
+/* Body with Day Labels + Grid */
+.heatmap-body {
+    display: flex;
+    gap: 4px;
+}
+
+/* Day Labels (vertical) */
+.day-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.6rem;
+    color: var(--text-secondary, #a0a0b0);
+    min-width: 28px;
+    padding-top: 1px;
+}
+
+.day-labels span {
+    height: 12px;
+    display: flex;
+    align-items: center;
+}
+
+/* Grid */
+.heatmap-grid {
+    display: grid;
+    gap: 3px;
+    flex: 1;
+}
+
+.heatmap-week {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Cells */
+.heatmap-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+    z-index: 10;
+    position: relative;
+}
+
+.heatmap-cell.empty {
+    visibility: hidden;
+}
+
+/* Contribution Levels - GitHub-inspired colors */
+.heatmap-cell.level-0 {
+    background-color: var(--contribution-none, #161b22);
+    border: 1px solid var(--border-primary, #2d2d44);
+}
+
+.heatmap-cell.level-1 {
+    background-color: var(--contribution-low, #0e4429);
+}
+
+.heatmap-cell.level-2 {
+    background-color: var(--contribution-medium, #006d32);
+}
+
+.heatmap-cell.level-3 {
+    background-color: var(--contribution-high, #26a641);
+}
+
+.heatmap-cell.level-4 {
+    background-color: var(--contribution-max, #39d353);
+}
+
+/* Legend */
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 1rem;
+    font-size: 0.65rem;
+    color: var(--text-secondary, #a0a0b0);
+}
+
+.legend-label {
+    padding: 0 4px;
+}
+
+.legend-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-cell.level-0 {
+    background-color: var(--contribution-none, #161b22);
+    border: 1px solid var(--border-primary, #2d2d44);
+}
+
+.legend-cell.level-1 {
+    background-color: var(--contribution-low, #0e4429);
+}
+
+.legend-cell.level-2 {
+    background-color: var(--contribution-medium, #006d32);
+}
+
+.legend-cell.level-3 {
+    background-color: var(--contribution-high, #26a641);
+}
+
+.legend-cell.level-4 {
+    background-color: var(--contribution-max, #39d353);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .heatmap-container {
+        padding: 1rem;
+    }
+    
+    .heatmap-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .heatmap-cell {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .legend-cell {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .day-labels span {
+        height: 10px;
+    }
+}
+
