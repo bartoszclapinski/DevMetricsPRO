@@ -182,4 +182,107 @@ public class ChartDataService : IChartDataService
             throw;
         }
     }
+
+    public async Task<ContributionHeatmapDto> GetContributionHeatmapAsync(
+        int numberOfWeeks = 52,
+        Guid? developerId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var endDate = DateTime.UtcNow.Date;
+        var startDate = endDate.AddDays(-(numberOfWeeks * 7) + 1);
+
+        try
+        {
+            _logger.LogInformation(
+                "Fetching contribution heatmap for {Weeks} weeks (from {StartDate} to {EndDate}) for developer {DeveloperId}",
+                numberOfWeeks, startDate, endDate, developerId);
+
+            // Get all commits in the date range
+            var query = _unitOfWork.Repository<Commit>()
+                .Query()
+                .AsNoTracking()
+                .Where(c => c.CommittedAt >= startDate && c.CommittedAt <= endDate);
+
+            // Filter by developer if specified
+            if (developerId.HasValue)
+            {
+                query = query.Where(c => c.DeveloperId == developerId.Value);
+            }
+
+            // Group by date and count
+            var commitsByDate = await query
+                .GroupBy(c => c.CommittedAt.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Count = g.Count()
+                })
+                .ToDictionaryAsync(x => x.Date, x => x.Count, cancellationToken);
+
+            // Calculate max contributions for level scaling
+            var maxContributions = commitsByDate.Any() 
+                ? commitsByDate.Values.Max() 
+                : 0;
+
+            // Generate all days in the range with contribution levels
+            var days = new List<DayContribution>();
+            var totalContributions = 0;
+
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                var count = commitsByDate.GetValueOrDefault(date, 0);
+                totalContributions += count;
+
+                days.Add(new DayContribution
+                {
+                    Date = date,
+                    Count = count,
+                    Level = CalculateContributionLevel(count, maxContributions)
+                });
+            }
+
+            _logger.LogInformation(
+                "Generated heatmap with {TotalDays} days, {TotalContributions} total contributions, max {MaxContributions}/day",
+                days.Count, totalContributions, maxContributions);
+
+            return new ContributionHeatmapDto
+            {
+                Days = days,
+                MaxContributions = maxContributions,
+                TotalContributions = totalContributions,
+                NumberOfWeeks = numberOfWeeks,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching contribution heatmap data");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Calculate contribution level based on count relative to max.
+    /// Uses GitHub-style quartile-based levels.
+    /// </summary>
+    private static ContributionLevel CalculateContributionLevel(int count, int maxContributions)
+    {
+        if (count == 0)
+            return ContributionLevel.None;
+
+        if (maxContributions == 0)
+            return ContributionLevel.None;
+
+        // Calculate percentage of max
+        var percentage = (double)count / maxContributions * 100;
+
+        return percentage switch
+        {
+            <= 25 => ContributionLevel.Low,
+            <= 50 => ContributionLevel.Medium,
+            <= 75 => ContributionLevel.High,
+            _ => ContributionLevel.Max
+        };
+    }
 }

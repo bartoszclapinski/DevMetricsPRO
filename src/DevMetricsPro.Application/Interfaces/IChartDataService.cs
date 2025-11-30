@@ -32,4 +32,16 @@ public interface IChartDataService
         int days = 30,
         Guid? developerId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get contribution heatmap data for GitHub-style visualization
+    /// </summary>
+    /// <param name="numberOfWeeks">Number of weeks to display (default: 52)</param>
+    /// <param name="developerId">Optional developer ID to filter by</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Heatmap data with daily contribution counts and levels</returns>
+    Task<ContributionHeatmapDto> GetContributionHeatmapAsync(
+        int numberOfWeeks = 52,
+        Guid? developerId = null,
+        CancellationToken cancellationToken = default);
 }

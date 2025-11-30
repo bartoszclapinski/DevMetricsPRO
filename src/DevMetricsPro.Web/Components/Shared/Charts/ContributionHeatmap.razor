@@ -1,0 +1,183 @@
+@using DevMetricsPro.Application.DTOs.Charts
+
+<div class="heatmap-container">
+    @if (IsLoading)
+    {
+        <div class="heatmap-loading">
+            <div class="loading-spinner"></div>
+            <span>Loading contribution data...</span>
+        </div>
+    }
+    else if (Data is null || !Data.Days.Any())
+    {
+        <div class="heatmap-empty">
+            <span class="empty-icon">📊</span>
+            <span>No contribution data available</span>
+        </div>
+    }
+    else
+    {
+        <div class="heatmap-header">
+            <h4 class="heatmap-title">@Title</h4>
+            <div class="heatmap-stats">
+                <span class="stat-value">@Data.TotalContributions</span>
+                <span class="stat-label">contributions in the last @Data.NumberOfWeeks weeks</span>
+            </div>
+        </div>
+        
+        <div class="heatmap-content">
+            <!-- Month labels -->
+            <div class="month-labels">
+                @foreach (var month in GetMonthLabels())
+                {
+                    <span class="month-label" style="grid-column: @month.Column;">@month.Name</span>
+                }
+            </div>
+            
+            <!-- Day labels + Grid -->
+            <div class="heatmap-body">
+                <div class="day-labels">
+                    <span></span>
+                    <span>Mon</span>
+                    <span></span>
+                    <span>Wed</span>
+                    <span></span>
+                    <span>Fri</span>
+                    <span></span>
+                </div>
+                
+                <div class="heatmap-grid" style="grid-template-columns: repeat(@GetWeekCount(), 1fr);">
+                    @foreach (var week in GetWeeks())
+                    {
+                        <div class="heatmap-week">
+                            @foreach (var day in week)
+                            {
+                                @if (day is not null)
+                                {
+                                    <div class="heatmap-cell level-@((int)day.Level)"
+                                         title="@day.Date.ToString("MMM dd, yyyy"): @day.Count contribution@(day.Count != 1 ? "s" : "")">
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="heatmap-cell empty"></div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="heatmap-legend">
+            <span class="legend-label">Less</span>
+            <div class="legend-cell level-0"></div>
+            <div class="legend-cell level-1"></div>
+            <div class="legend-cell level-2"></div>
+            <div class="legend-cell level-3"></div>
+            <div class="legend-cell level-4"></div>
+            <span class="legend-label">More</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ContributionHeatmapDto? Data { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Contribution Activity";
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    /// <summary>
+    /// Organizes days into weeks (columns) for CSS grid display.
+    /// Each week contains 7 days (Sun-Sat), with nulls for padding.
+    /// </summary>
+    private List<List<DayContribution?>> GetWeeks()
+    {
+        if (Data?.Days is null || !Data.Days.Any())
+            return new List<List<DayContribution?>>();
+
+        var weeks = new List<List<DayContribution?>>();
+        var currentWeek = new List<DayContribution?>();
+        
+        // Pad the first week with empty cells if needed
+        var firstDay = Data.Days.First();
+        var dayOfWeek = (int)firstDay.Date.DayOfWeek;
+        
+        for (var i = 0; i < dayOfWeek; i++)
+        {
+            currentWeek.Add(null);
+        }
+
+        foreach (var day in Data.Days)
+        {
+            currentWeek.Add(day);
+            
+            if (currentWeek.Count == 7)
+            {
+                weeks.Add(currentWeek);
+                currentWeek = new List<DayContribution?>();
+            }
+        }
+
+        // Add the last partial week if any
+        if (currentWeek.Any())
+        {
+            while (currentWeek.Count < 7)
+            {
+                currentWeek.Add(null);
+            }
+            weeks.Add(currentWeek);
+        }
+
+        return weeks;
+    }
+
+    private int GetWeekCount()
+    {
+        return GetWeeks().Count;
+    }
+
+    /// <summary>
+    /// Gets month labels with their grid column positions.
+    /// </summary>
+    private List<(string Name, int Column)> GetMonthLabels()
+    {
+        if (Data?.Days is null || !Data.Days.Any())
+            return new List<(string, int)>();
+
+        var labels = new List<(string Name, int Column)>();
+        var weeks = GetWeeks();
+        
+        string? lastMonth = null;
+        
+        for (var weekIndex = 0; weekIndex < weeks.Count; weekIndex++)
+        {
+            var week = weeks[weekIndex];
+            // Find the first non-null day in the week
+            var firstDay = week.FirstOrDefault(d => d is not null);
+            
+            if (firstDay is not null)
+            {
+                var monthName = firstDay.Date.ToString("MMM");
+                
+                if (monthName != lastMonth)
+                {
+                    // Only show label if we're at the start of a month (day 1-7)
+                    if (firstDay.Date.Day <= 7 || lastMonth is null)
+                    {
+                        labels.Add((monthName, weekIndex + 1)); // CSS grid is 1-based
+                    }
+                    lastMonth = monthName;
+                }
+            }
+        }
+
+        return labels;
+    }
+}
+

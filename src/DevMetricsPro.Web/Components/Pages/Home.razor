@@ -212,6 +212,43 @@ else
         }
     </MudPaper>
 
+    <!-- Contribution Heatmap - Phase 3.4 -->
+    <MudPaper Class="pa-4 mt-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <MudText Typo="Typo.h5">🗓️ Contribution Activity</MudText>
+            
+            <!-- Week Range Selector -->
+            <div style="display: flex; gap: 8px;">
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedWeeks == 13 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadHeatmapAsync(13)">
+                    3 Months
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedWeeks == 26 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadHeatmapAsync(26)">
+                    6 Months
+                </MudButton>
+                <MudButton 
+                    Size="Size.Small" 
+                    Variant="@(_selectedWeeks == 52 ? Variant.Filled : Variant.Outlined)"
+                    Color="Color.Primary"
+                    OnClick="() => LoadHeatmapAsync(52)">
+                    1 Year
+                </MudButton>
+            </div>
+        </div>
+
+        <ContributionHeatmap 
+            Data="@_heatmapData"
+            Title="Commit Contributions"
+            IsLoading="@_isLoadingHeatmap" />
+    </MudPaper>
+
     <!-- Panels Grid -->
     <div class="panel-grid" style="margin-top: 24px;">
         <DataPanel Title="Activity Overview">
@@ -316,6 +353,11 @@ else
     private PullRequestChartDto? _prChartData;
     private bool _isLoadingPRChart = false;
     private int _selectedPRDays = 30;
+
+    // Heatmap data - Phase 3.4
+    private ContributionHeatmapDto? _heatmapData;
+    private bool _isLoadingHeatmap = false;
+    private int _selectedWeeks = 52;
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
@@ -326,6 +368,7 @@ else
             await LoadRecentCommitsAsync();
             await LoadCommitActivityAsync(7);
             await LoadPRStatsAsync(30);
+            await LoadHeatmapAsync(52);
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -518,6 +561,30 @@ else
         finally
         {
             _isLoadingPRChart = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadHeatmapAsync(int weeks)
+    {
+        _selectedWeeks = weeks;
+        _isLoadingHeatmap = true;
+        StateHasChanged();
+
+        try
+        {
+            _heatmapData = await ChartDataService.GetContributionHeatmapAsync(
+                numberOfWeeks: weeks,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading contribution heatmap");
+            Snackbar.Add("Failed to load contribution heatmap", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingHeatmap = false;
             StateHasChanged();
         }
     }
