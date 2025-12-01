@@ -117,7 +117,10 @@ try
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
     // Chart data services
-builder.Services.AddScoped<IChartDataService, ChartDataService>();
+    builder.Services.AddScoped<IChartDataService, ChartDataService>();
+    
+    // Leaderboard services
+    builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
     
     // Authentication state service
     builder.Services.AddScoped<AuthStateService>();

@@ -1,10 +1,14 @@
 ﻿@page "/"
+@using DevMetricsPro.Application.DTOs
 @using DevMetricsPro.Application.DTOs.Charts
+@using DevMetricsPro.Application.Enums
 @using DevMetricsPro.Application.Interfaces
+@using DevMetricsPro.Web.Components.Shared
 @using DevMetricsPro.Web.Components.Shared.Charts
 @using DevMetricsPro.Web.Services
 @inject AuthStateService AuthState
 @inject IChartDataService ChartDataService
+@inject ILeaderboardService LeaderboardService
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
@@ -249,6 +253,19 @@ else
             IsLoading="@_isLoadingHeatmap" />
     </MudPaper>
 
+    <!-- Team Leaderboard - Phase 3.5 -->
+    <MudPaper Class="pa-4 mt-4">
+        <MudText Typo="Typo.h5" Class="mb-4">🏆 Top Contributors (Last 30 Days)</MudText>
+        
+        <Leaderboard 
+            Entries="@_leaderboardEntries"
+            Title="Team Leaderboard"
+            IsLoading="@_isLoadingLeaderboard"
+            ShowMetricSelector="true"
+            SelectedMetric="@_selectedMetric"
+            OnMetricChanged="OnLeaderboardMetricChanged" />
+    </MudPaper>
+
     <!-- Panels Grid -->
     <div class="panel-grid" style="margin-top: 24px;">
         <DataPanel Title="Activity Overview">
@@ -358,6 +375,11 @@ else
     private ContributionHeatmapDto? _heatmapData;
     private bool _isLoadingHeatmap = false;
     private int _selectedWeeks = 52;
+
+    // Leaderboard data - Phase 3.5
+    private List<LeaderboardEntryDto>? _leaderboardEntries;
+    private bool _isLoadingLeaderboard = false;
+    private LeaderboardMetric _selectedMetric = LeaderboardMetric.Commits;
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
@@ -369,6 +391,7 @@ else
             await LoadCommitActivityAsync(7);
             await LoadPRStatsAsync(30);
             await LoadHeatmapAsync(52);
+            await LoadLeaderboardAsync(_selectedMetric);
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -587,6 +610,41 @@ else
             _isLoadingHeatmap = false;
             StateHasChanged();
         }
+    }
+
+    private async Task LoadLeaderboardAsync(LeaderboardMetric metric)
+    {
+        _selectedMetric = metric;
+        _isLoadingLeaderboard = true;
+        StateHasChanged();
+
+        try
+        {
+            var endDate = DateTime.UtcNow;
+            var startDate = endDate.AddDays(-30); // Last 30 days
+
+            _leaderboardEntries = await LeaderboardService.GetLeaderboardAsync(
+                metric: metric,
+                topN: 10,
+                startDate: startDate,
+                endDate: endDate,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading leaderboard");
+            Snackbar.Add("Failed to load leaderboard", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingLeaderboard = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnLeaderboardMetricChanged(LeaderboardMetric metric)
+    {
+        await LoadLeaderboardAsync(metric);
     }
 
     // Helper classes for deserializing API responses
