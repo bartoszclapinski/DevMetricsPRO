@@ -1,0 +1,155 @@
+@using DevMetricsPro.Application.DTOs
+@using DevMetricsPro.Application.Enums
+
+<div class="leaderboard-container">
+    @if (IsLoading)
+    {
+        <div class="leaderboard-loading">
+            <div class="loading-spinner"></div>
+            <span>Loading leaderboard...</span>
+        </div>
+    }
+    else if (Entries is null || !Entries.Any())
+    {
+        <div class="leaderboard-empty">
+            <span class="empty-icon">🏆</span>
+            <span>No leaderboard data available</span>
+        </div>
+    }
+    else
+    {
+        <div class="leaderboard-header">
+            <h4 class="leaderboard-title">@Title</h4>
+            @if (ShowMetricSelector)
+            {
+                <div class="metric-selector">
+                    <select @bind="SelectedMetric" @bind:after="OnMetricChangedAsync" class="metric-dropdown">
+                        <option value="@LeaderboardMetric.Commits">Commits</option>
+                        <option value="@LeaderboardMetric.PullRequests">Pull Requests</option>
+                        <option value="@LeaderboardMetric.LinesChanged">Lines Changed</option>
+                        <option value="@LeaderboardMetric.ActiveDays">Active Days</option>
+                    </select>
+                </div>
+            }
+        </div>
+
+        <div class="leaderboard-list">
+            @foreach (var entry in Entries)
+            {
+                <div class="leaderboard-entry @GetRankClass(entry.Rank)">
+                    <div class="rank-badge">
+                        @if (entry.Rank <= 3)
+                        {
+                            <span class="trophy">@GetTrophy(entry.Rank)</span>
+                        }
+                        else
+                        {
+                            <span class="rank-number">@entry.Rank</span>
+                        }
+                    </div>
+
+                    <div class="developer-info">
+                        @if (!string.IsNullOrEmpty(entry.AvatarUrl))
+                        {
+                            <img src="@entry.AvatarUrl" alt="@entry.DeveloperName" class="avatar" />
+                        }
+                        else
+                        {
+                            <div class="avatar-placeholder">
+                                @GetInitials(entry.DeveloperName)
+                            </div>
+                        }
+                        <span class="developer-name">@entry.DeveloperName</span>
+                    </div>
+
+                    <div class="value-info">
+                        <span class="value">@FormatValue(entry.Value)</span>
+                        <span class="trend @GetTrendClass(entry.Trend)">
+                            @GetTrendIcon(entry.Trend) @entry.Change
+                        </span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<LeaderboardEntryDto>? Entries { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Top Contributors";
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public bool ShowMetricSelector { get; set; } = true;
+
+    [Parameter]
+    public LeaderboardMetric SelectedMetric { get; set; } = LeaderboardMetric.Commits;
+
+    [Parameter]
+    public EventCallback<LeaderboardMetric> OnMetricChanged { get; set; }
+
+    private async Task OnMetricChangedAsync()
+    {
+        await OnMetricChanged.InvokeAsync(SelectedMetric);
+    }
+
+    private static string GetTrophy(int rank) => rank switch
+    {
+        1 => "🥇",
+        2 => "🥈",
+        3 => "🥉",
+        _ => ""
+    };
+
+    private static string GetRankClass(int rank) => rank switch
+    {
+        1 => "rank-gold",
+        2 => "rank-silver",
+        3 => "rank-bronze",
+        _ => ""
+    };
+
+    private static string GetTrendIcon(TrendDirection trend) => trend switch
+    {
+        TrendDirection.Up => "↑",
+        TrendDirection.Down => "↓",
+        _ => ""
+    };
+
+    private static string GetTrendClass(TrendDirection trend) => trend switch
+    {
+        TrendDirection.Up => "trend-up",
+        TrendDirection.Down => "trend-down",
+        _ => "trend-neutral"
+    };
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return "?";
+
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+
+        return name.Length >= 2 
+            ? name[..2].ToUpper() 
+            : name.ToUpper();
+    }
+
+    private static string FormatValue(int value)
+    {
+        return value switch
+        {
+            >= 1000000 => $"{value / 1000000.0:F1}M",
+            >= 1000 => $"{value / 1000.0:F1}K",
+            _ => value.ToString()
+        };
+    }
+}
+
