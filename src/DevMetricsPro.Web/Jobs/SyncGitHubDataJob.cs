@@ -1,4 +1,5 @@
 using DevMetricsPro.Application.Caching;
+using DevMetricsPro.Application.DTOs;
 using DevMetricsPro.Application.Interfaces;
 using DevMetricsPro.Core.Entities;
 using DevMetricsPro.Core.Enums;
@@ -21,6 +22,7 @@ public class SyncGitHubDataJob
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<SyncGitHubDataJob> _logger;
     private readonly ICacheService _cacheService;
+    private readonly IMetricsHubService _metricsHubService;
     private static readonly int[] RecentCommitLimits = [10];
 
     public SyncGitHubDataJob(
@@ -31,7 +33,8 @@ public class SyncGitHubDataJob
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         ILogger<SyncGitHubDataJob> logger,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IMetricsHubService metricsHubService)
     {
         _repositoryService = repositoryService;
         _commitsService = commitsService;
@@ -41,6 +44,7 @@ public class SyncGitHubDataJob
         _userManager = userManager;
         _logger = logger;
         _cacheService = cacheService;
+        _metricsHubService = metricsHubService;
     }
 
     /// <summary>
@@ -53,6 +57,9 @@ public class SyncGitHubDataJob
         try
         {
             _logger.LogInformation("Starting GitHub data sync for user {UserId}", userId);
+
+            // Notify clients that sync has started
+            await _metricsHubService.NotifySyncStartedAsync(userId);
 
             // Get user with GitHub connection
             var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -203,10 +210,30 @@ public class SyncGitHubDataJob
                 userId, syncedRepos.Count, totalCommitsSynced, totalPRsSynced);
 
             await InvalidateCacheAsync(userId, CancellationToken.None);
+
+            // Notify clients that sync has completed
+            var syncResult = new SyncResultDto
+            {
+                RepositoriesSynced = syncedRepos.Count,
+                CommitsSynced = totalCommitsSynced,
+                PullRequestsSynced = totalPRsSynced,
+                MetricsCalculated = true,
+                Success = true
+            };
+            await _metricsHubService.NotifySyncCompletedAsync(userId, syncResult);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during GitHub data sync for user {UserId}", userId);
+            
+            // Notify clients about the failure
+            var errorResult = new SyncResultDto
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+            await _metricsHubService.NotifySyncCompletedAsync(userId, errorResult);
+            
             throw; // Re-throw to let Hangfire handle retry
         }
     }
