@@ -23,6 +23,7 @@ using DevMetricsPro.Application.Validators;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Http.Features;
 using DevMetricsPro.Application.Services;
+using DevMetricsPro.Web.Hubs;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -166,6 +167,10 @@ try
     // Background Jobs
     builder.Services.AddScoped<DevMetricsPro.Web.Jobs.SyncGitHubDataJob>();
 
+    // SignalR for real-time updates
+    builder.Services.AddSignalR();
+    builder.Services.AddScoped<IMetricsHubService, MetricsHubService>();
+
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
     {
@@ -287,6 +292,9 @@ try
         .AddInteractiveServerRenderMode();
 
     app.MapControllers();
+
+    // SignalR hub endpoint
+    app.MapHub<MetricsHub>("/hubs/metrics");
 
     Log.Information("Starting DevMetrics Pro application");
     app.Run();
