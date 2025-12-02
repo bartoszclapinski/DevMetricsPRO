@@ -51,13 +51,18 @@ After the AI reads those files, it should:
 ### 1. **Understand Current State**
 - ✅ Know **Sprint 1** is **COMPLETE** (Authentication) ✅
 - ✅ Know **Sprint 2** is **COMPLETE** (GitHub Integration & Background Jobs) ✅
-- ✅ Know **Sprint 3** is **IN PROGRESS** (Charts & Real-time Dashboard)
+- ✅ Know **Sprint 3** is **IN PROGRESS** at **80%** (Charts & Real-time Dashboard)
   - Phase 3.1: Chart Library Setup ✅
   - Phase 3.2: Commit Activity Chart ✅
   - Phase 3.3: PR Statistics Bar Chart ✅
-  - Phase 3.4: Contribution Heatmap (NEXT)
-  - Phase 3.5-3.10: Remaining features
-- ✅ Know the **next phase** is **Phase 3.4** (Contribution Heatmap)
+  - Phase 3.4: Contribution Heatmap ✅
+  - Phase 3.5: Team Leaderboard ✅
+  - Phase 3.6: SignalR Hub Setup ✅
+  - Phase 3.7: Client-Side SignalR ✅
+  - Phase 3.8: Advanced Metrics ✅
+  - Phase 3.9: Time Range Filters (NEXT)
+  - Phase 3.10: Polish & Performance
+- ✅ Know the **next phase** is **Phase 3.9** (Time Range Filters)
 
 ### 2. **Understand the Workflow**
 - ✅ **AI provides guidance** on what to implement and how
@@ -76,6 +81,7 @@ After the AI reads those files, it should:
 - Entity Framework Core 9
 - MudBlazor for UI
 - **Chart.js** for visualizations (via JSInterop)
+- **SignalR** for real-time updates
 - Hangfire for background jobs
 
 ### 4. **Follow the Architecture**
@@ -113,7 +119,7 @@ Core ← Application ← Infrastructure
     ├── sprint1/                  # Completed ✅
     ├── sprint2/                  # Completed ✅
     │   └── SPRINT2-HANDOFF.md   # Handoff document
-    └── sprint3/                  # CURRENT 🚀
+    └── sprint3/                  # CURRENT 🚀 (80% complete!)
         ├── sprint-plan.md        # Current sprint plan
         └── sprint-log.md         # Daily progress ← READ THIS!
 ```
@@ -123,19 +129,24 @@ Core ← Application ← Infrastructure
 src/
 ├── DevMetricsPro.Core/              # Domain entities, interfaces
 ├── DevMetricsPro.Application/       # Business logic, DTOs, services
-│   ├── DTOs/Charts/                 # Chart DTOs (NEW!)
+│   ├── DTOs/Charts/                 # Chart DTOs
+│   ├── DTOs/Metrics/                # Advanced metric DTOs (NEW!)
 │   ├── Interfaces/                  # Service interfaces
-│   └── Services/                    # ChartDataService (NEW!)
+│   └── Services/                    # ChartDataService, LeaderboardService
 ├── DevMetricsPro.Infrastructure/    # Data access, repositories, EF Core
+│   └── Services/                    # MetricsCalculationService
 └── DevMetricsPro.Web/               # Blazor UI, API controllers
     ├── Components/
-    │   ├── Pages/                   # Home, Login, Register, etc.
+    │   ├── Pages/                   # Home (full dashboard!), Login, Register, etc.
     │   ├── Layout/                  # MainLayout, TopNav
     │   └── Shared/
-    │       └── Charts/              # LineChart, BarChart (NEW!)
+    │       ├── Charts/              # LineChart, BarChart, ContributionHeatmap
+    │       └── Leaderboard.razor    # Team leaderboard
     ├── Controllers/                 # API endpoints
+    ├── Hubs/                        # MetricsHub (SignalR!)
     ├── Jobs/                        # Hangfire background jobs
-    └── wwwroot/js/charts.js         # Chart.js JSInterop wrapper (NEW!)
+    ├── Services/                    # SignalRService, MetricsHubService
+    └── wwwroot/js/charts.js         # Chart.js JSInterop wrapper
 ```
 
 ### Helper Scripts
@@ -150,28 +161,28 @@ src/
 
 ---
 
-## 🚀 What to Do Next (Phase 3.4 - Contribution Heatmap)
+## 🚀 What to Do Next (Phase 3.9 - Time Range Filters)
 
-Based on `sprint-log.md`, the next phase is **Phase 3.4: Contribution Heatmap**:
+Based on `sprint-log.md`, the next phase is **Phase 3.9: Time Range Filters**:
 
-1. **Create Heatmap Data Service**
-   - Add `GetContributionHeatmapAsync()` to `IChartDataService`
-   - Create `ContributionHeatmapDto` DTO
-   - Query commits grouped by date
+1. **Create TimeRangeSelector Component**
+   - Preset buttons (7d, 30d, 90d, 1y, All)
+   - Custom date picker option
+   - Emits `EventCallback` on change
 
-2. **Build CSS-only Heatmap Component**
-   - Create `ContributionHeatmap.razor` component
-   - Use CSS Grid (7 columns for days of week)
-   - Color intensity based on commit count
-   - GitHub-style appearance
+2. **Create DashboardStateService**
+   - Manages selected date range
+   - Fires `OnStateChanged` event
+   - Registered as Scoped service
 
-3. **Add Tooltips**
-   - Show date and commit count on hover
-   - Smooth hover transitions
+3. **Update All Charts**
+   - Subscribe to state changes
+   - Reload data when range changes
+   - Show loading states during refresh
 
-4. **Integrate into Dashboard**
-   - Add to Home.razor or create DeveloperProfile page
-   - Add date range selector (52 weeks default)
+4. **Integration**
+   - Add global selector to dashboard header
+   - All charts respond to changes
 
 ---
 
@@ -253,8 +264,8 @@ dotnet test
 ## 📊 Current Sprint Status
 
 **Sprint**: Sprint 3 - Charts & Real-time Dashboard  
-**Progress**: ~30% Complete (Phases 3.1-3.3 done!)  
-**Next**: Phase 3.4 - Contribution Heatmap
+**Progress**: ~80% Complete (Phases 3.1-3.8 done!)  
+**Next**: Phase 3.9 - Time Range Filters
 
 ### ✅ Sprint 1 - Complete:
 - Core entities (Developer, Repository, Commit, PR, Metric)
@@ -272,14 +283,17 @@ dotnet test
 - Metrics calculation service
 - Professional UI redesign
 
-### 🏃 Sprint 3 - In Progress:
+### 🏃 Sprint 3 - In Progress (80%!):
 - ✅ Phase 3.1: Chart Library Setup (Chart.js via JSInterop)
 - ✅ Phase 3.2: Commit Activity Chart (line chart with real data!)
 - ✅ Phase 3.3: PR Statistics Bar Chart
-- ⏳ Phase 3.4: Contribution Heatmap (NEXT)
-- ⏳ Phase 3.5: Team Leaderboard
-- ⏳ Phase 3.6-3.7: SignalR Real-time Updates
-- ⏳ Phase 3.8-3.10: Advanced Metrics & Polish
+- ✅ Phase 3.4: Contribution Heatmap (GitHub-style!)
+- ✅ Phase 3.5: Team Leaderboard (with metric selector!)
+- ✅ Phase 3.6: SignalR Hub Setup
+- ✅ Phase 3.7: Client-Side SignalR (auto-refresh!)
+- ✅ Phase 3.8: Advanced Metrics (PR review time, velocity!)
+- ⏳ Phase 3.9: Time Range Filters (NEXT)
+- ⏳ Phase 3.10: Polish & Performance
 
 ---
 
@@ -293,6 +307,7 @@ Before starting work, verify:
 4. ✅ **Dev server works**: Can access `https://localhost:5234`
 5. ✅ **Auth works**: Can register and login
 6. ✅ **Charts work**: Dashboard shows commit and PR charts
+7. ✅ **SignalR works**: Dashboard refreshes on sync
 
 ---
 
@@ -335,15 +350,15 @@ You'll know you're on the right track when:
 
 Once you've read the required files and understand the project status, you should:
 
-1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 3, Phases 3.1-3.3 complete (Chart.js setup, Commit Activity Chart, PR Statistics Bar Chart). Next is Phase 3.4 (Contribution Heatmap)."
-2. **Summarize status**: "Dashboard now shows real GitHub data in interactive charts. Line chart for commits, bar chart for PRs. Time range selectors working."
-3. **Ask for direction**: "Would you like to continue with Phase 3.4 (Contribution Heatmap), or work on something else?"
+1. **Confirm understanding**: "I've read the sprint log. We're in Sprint 3 at 80% complete. Phases 3.1-3.8 done (charts, heatmap, leaderboard, SignalR, advanced metrics). Next is Phase 3.9 (Time Range Filters)."
+2. **Summarize status**: "Dashboard now has line charts, bar charts, heatmap, leaderboard, real-time updates, and advanced metrics!"
+3. **Ask for direction**: "Would you like to continue with Phase 3.9 (Time Range Filters), or work on something else?"
 
 Let's build something great! 🎉
 
 ---
 
-**Last Updated**: November 27, 2025  
-**Sprint**: Sprint 3, ~30% Complete (Phases 3.1-3.3 done!)  
-**Version**: 4.0
+**Last Updated**: December 2, 2025  
+**Sprint**: Sprint 3, ~80% Complete (Phases 3.1-3.8 done!)  
+**Version**: 5.0
 
