@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using DevMetricsPro.Application.DTOs
 @using DevMetricsPro.Application.DTOs.Charts
+@using DevMetricsPro.Application.DTOs.Metrics
 @using DevMetricsPro.Application.Enums
 @using DevMetricsPro.Application.Interfaces
 @using DevMetricsPro.Web.Components.Shared
@@ -11,6 +12,7 @@
 @inject AuthStateService AuthState
 @inject IChartDataService ChartDataService
 @inject ILeaderboardService LeaderboardService
+@inject IMetricsCalculationService MetricsService
 @inject SignalRService SignalR
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -288,6 +290,89 @@ else
             OnMetricChanged="OnLeaderboardMetricChanged" />
     </MudPaper>
 
+    <!-- Advanced Metrics - Phase 3.8 -->
+    <div class="metrics-grid" style="margin-top: 24px;">
+        <!-- PR Review Time Metrics -->
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">⏱️ PR Review Time</MudText>
+            @if (_isLoadingReviewMetrics)
+            {
+                <div style="text-align: center; padding: 20px;">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                </div>
+            }
+            else if (_reviewMetrics != null && _reviewMetrics.TotalPRsAnalyzed > 0)
+            {
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Avg Time to Merge</span>
+                        <strong style="color: var(--mud-palette-primary);">@_reviewMetrics.AverageTimeToMergeFormatted</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Median</span>
+                        <strong>@FormatDuration(_reviewMetrics.MedianTimeToMergeHours)</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Merge Rate</span>
+                        <strong style="color: @(_reviewMetrics.MergeRatePercent >= 70 ? "var(--mud-palette-success)" : "var(--mud-palette-warning)")">
+                            @_reviewMetrics.MergeRatePercent.ToString("F0")%
+                        </strong>
+                    </div>
+                    <MudDivider Class="my-2" />
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>@_reviewMetrics.MergedPRs merged / @_reviewMetrics.TotalPRsAnalyzed total PRs</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; color: var(--mud-palette-text-secondary); padding: 20px;">
+                    <MudText Typo="Typo.body2">No PR data available</MudText>
+                </div>
+            }
+        </MudPaper>
+
+        <!-- Code Velocity Metrics -->
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">🚀 Code Velocity</MudText>
+            @if (_isLoadingVelocity)
+            {
+                <div style="text-align: center; padding: 20px;">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                </div>
+            }
+            else if (_velocityMetrics != null && _velocityMetrics.TotalCommits > 0)
+            {
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Avg Commits/Week</span>
+                        <strong style="color: var(--mud-palette-primary);">@_velocityMetrics.AverageCommitsPerWeek.ToString("F1")</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Avg Lines/Week</span>
+                        <strong>@_velocityMetrics.AverageLinesPerWeek.ToString("N0")</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--mud-palette-text-secondary);">Trend</span>
+                        <strong style="color: @GetTrendColor(_velocityMetrics.CommitTrend)">
+                            @GetTrendIcon(_velocityMetrics.CommitTrend) @Math.Abs(_velocityMetrics.CommitTrendPercent).ToString("F0")%
+                        </strong>
+                    </div>
+                    <MudDivider Class="my-2" />
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>@_velocityMetrics.WeeksAnalyzed weeks analyzed</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; color: var(--mud-palette-text-secondary); padding: 20px;">
+                    <MudText Typo="Typo.body2">No velocity data available</MudText>
+                </div>
+            }
+        </MudPaper>
+    </div>
+
     <!-- Panels Grid -->
     <div class="panel-grid" style="margin-top: 24px;">
         <DataPanel Title="Activity Overview">
@@ -409,6 +494,12 @@ else
     private bool _signalRConnectionAttempted = false;
     private string? _currentUserId;
 
+    // Advanced metrics - Phase 3.8
+    private ReviewTimeMetricsDto? _reviewMetrics;
+    private CodeVelocityDto? _velocityMetrics;
+    private bool _isLoadingReviewMetrics = false;
+    private bool _isLoadingVelocity = false;
+
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
@@ -424,6 +515,7 @@ else
             await LoadPRStatsAsync(30);
             await LoadHeatmapAsync(52);
             await LoadLeaderboardAsync(_selectedMetric);
+            await LoadAdvancedMetricsAsync();
 
             // Initialize SignalR connection
             await InitializeSignalRAsync();
@@ -544,11 +636,93 @@ else
             LoadCommitActivityAsync(_selectedDays),
             LoadPRStatsAsync(_selectedPRDays),
             LoadHeatmapAsync(_selectedWeeks),
-            LoadLeaderboardAsync(_selectedMetric)
+            LoadLeaderboardAsync(_selectedMetric),
+            LoadAdvancedMetricsAsync()
         };
 
         await Task.WhenAll(tasks);
     }
+
+    private async Task LoadAdvancedMetricsAsync()
+    {
+        // Load both metrics in parallel
+        var reviewTask = LoadReviewTimeMetricsAsync();
+        var velocityTask = LoadCodeVelocityAsync();
+        await Task.WhenAll(reviewTask, velocityTask);
+    }
+
+    private async Task LoadReviewTimeMetricsAsync()
+    {
+        _isLoadingReviewMetrics = true;
+        StateHasChanged();
+
+        try
+        {
+            var endDate = DateTime.UtcNow;
+            var startDate = endDate.AddDays(-30);
+
+            _reviewMetrics = await MetricsService.GetReviewTimeMetricsAsync(
+                developerId: null, // All developers
+                startDate: startDate,
+                endDate: endDate,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading review time metrics");
+        }
+        finally
+        {
+            _isLoadingReviewMetrics = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCodeVelocityAsync()
+    {
+        _isLoadingVelocity = true;
+        StateHasChanged();
+
+        try
+        {
+            _velocityMetrics = await MetricsService.GetCodeVelocityAsync(
+                developerId: null, // All developers
+                numberOfWeeks: 12,
+                cancellationToken: default);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading code velocity metrics");
+        }
+        finally
+        {
+            _isLoadingVelocity = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatDuration(double hours)
+    {
+        if (hours < 1)
+            return $"{(int)(hours * 60)}m";
+        if (hours < 24)
+            return $"{hours:F1}h";
+        return $"{(hours / 24):F1}d";
+    }
+
+    private static string GetTrendColor(int trend) => trend switch
+    {
+        1 => "var(--mud-palette-success)",
+        -1 => "var(--mud-palette-error)",
+        _ => "var(--mud-palette-text-secondary)"
+    };
+
+    private static string GetTrendIcon(int trend) => trend switch
+    {
+        1 => "↑",
+        -1 => "↓",
+        _ => "→"
+    };
 
     private async Task CheckGitHubConnectionStatus()
     {
