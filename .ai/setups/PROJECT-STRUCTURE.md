@@ -1,6 +1,6 @@
 # DevMetrics Pro - Project Structure Reference
 
-**Last Updated**: November 27, 2025  
+**Last Updated**: December 2, 2025  
 **Purpose**: Complete project structure to check BEFORE implementing any new features to avoid duplication
 
 ---
@@ -81,12 +81,28 @@ DevMetricsPRO/
 | `DTOs/GitHub/GitHubCommitDto.cs` | **✅ COMMIT DATA** | Sha, Message, AuthorName, AuthorEmail, CommitterName, CommitterEmail, CommittedAt, AuthorDate, HtmlUrl, Additions, Deletions, TotalChanges, RepositoryName |
 | `DTOs/GitHub/GitHubPullRequestDto.cs` | **✅ PULL REQUEST DATA** | Number, Title, State, Body, HtmlUrl, AuthorLogin, AuthorName, CreatedAt, UpdatedAt, ClosedAt, MergedAt, IsMerged, IsDraft, Additions, Deletions, ChangedFiles, RepositoryName |
 
-### DTOs - Charts (NEW - Sprint 3!) 📊
+### DTOs - Charts (Sprint 3!) 📊
 
 | File | Purpose | Properties |
 |------|---------|------------|
 | `DTOs/Charts/CommitActivityChartDto.cs` | **✅ COMMIT CHART DATA** | Labels, Values, TotalCommits, AveragePerDay, StartDate, EndDate |
 | `DTOs/Charts/PullRequestChartDto.cs` | **✅ PR CHART DATA** | Labels, Values, TotalPRs, AverageReviewTimeHours, StartDate, EndDate |
+| `DTOs/Charts/ContributionHeatmapDto.cs` | **✅ HEATMAP DATA** | Days, MaxContributions, TotalContributions, StartDate, EndDate |
+
+### DTOs - Leaderboard & Metrics (Sprint 3!) 📊
+
+| File | Purpose | Properties |
+|------|---------|------------|
+| `DTOs/LeaderboardEntryDto.cs` | **✅ LEADERBOARD ENTRY** | Rank, DeveloperId, DeveloperName, AvatarUrl, Value, Change, TrendDirection |
+| `DTOs/SyncResultDto.cs` | **✅ SYNC RESULT** | RepositoriesSynced, CommitsSynced, PullRequestsSynced, MetricsCalculated, Success |
+| `DTOs/Metrics/ReviewTimeMetricsDto.cs` | **✅ PR REVIEW METRICS** | AverageTimeToMergeHours, MedianTimeToMergeHours, MergeRatePercent, TotalPRsAnalyzed |
+| `DTOs/Metrics/CodeVelocityDto.cs` | **✅ CODE VELOCITY** | WeeklyData, AverageCommitsPerWeek, AverageLinesPerWeek, CommitTrend |
+
+### Enums - Application
+
+| File | Values | Description |
+|------|--------|-------------|
+| `Enums/LeaderboardMetric.cs` | `Commits`, `PullRequests`, `LinesChanged`, `ActiveDays` | Leaderboard ranking metrics |
 
 **⚠️ IMPORTANT**: 
 - Use existing DTOs for all UI and API interactions!
@@ -101,14 +117,17 @@ DevMetricsPRO/
 | `Interfaces/IGitHubRepositoryService.cs` | `GetUserRepositoriesAsync()` | Fetch repos from GitHub API |
 | `Interfaces/IGitHubCommitsService.cs` | `GetRepositoryCommitsAsync()` | Fetch commits from GitHub API |
 | `Interfaces/IGitHubPullRequestService.cs` | `GetRepositoryPullRequestsAsync()` | Fetch PRs from GitHub API |
-| `Interfaces/IMetricsCalculationService.cs` | `CalculateMetricsForDeveloperAsync()`, `CalculateMetricsForAllDevelopersAsync()` | Calculate developer metrics |
-| `Interfaces/IChartDataService.cs` | `GetCommitActivityAsync()`, `GetPullRequestStatsAsync()` | **✅ NEW!** Chart data aggregation |
+| `Interfaces/IMetricsCalculationService.cs` | `CalculateMetricsForDeveloperAsync()`, `GetReviewTimeMetricsAsync()`, `GetCodeVelocityAsync()` | Calculate developer metrics |
+| `Interfaces/IChartDataService.cs` | `GetCommitActivityAsync()`, `GetPullRequestStatsAsync()`, `GetContributionHeatmapAsync()` | Chart data aggregation |
+| `Interfaces/ILeaderboardService.cs` | `GetLeaderboardAsync()` | Leaderboard data |
+| `Interfaces/IMetricsHubService.cs` | `NotifyMetricsUpdatedAsync()`, `NotifySyncCompletedAsync()`, `NotifySyncStartedAsync()` | SignalR notifications |
 
 ### Services (Application Layer)
 
 | File | Implements | Description |
 |------|------------|-------------|
-| `Services/ChartDataService.cs` | `IChartDataService` | **✅ NEW!** Aggregates data for charts |
+| `Services/ChartDataService.cs` | `IChartDataService` | Aggregates data for charts |
+| `Services/LeaderboardService.cs` | `ILeaderboardService` | Ranks developers by metric |
 
 ---
 
@@ -150,7 +169,7 @@ DevMetricsPRO/
 | `Services/GitHubRepositoryService.cs` | `IGitHubRepositoryService` | Fetch repos using Octokit.NET |
 | `Services/GitHubCommitsService.cs` | `IGitHubCommitsService` | Fetch commits using Octokit.NET |
 | `Services/GitHubPullRequestService.cs` | `IGitHubPullRequestService` | Fetch PRs using Octokit.NET |
-| `Services/MetricsCalculationService.cs` | `IMetricsCalculationService` | Calculate 5 developer metrics from commits/PRs |
+| `Services/MetricsCalculationService.cs` | `IMetricsCalculationService` | Calculate developer metrics including advanced metrics |
 
 ### Migrations
 
@@ -188,11 +207,26 @@ DevMetricsPRO/
 - ✅ `GET /api/github/pull-requests?repositoryId={guid}&status={all|open|closed|merged}` - Get PRs from database
 - ✅ `POST /api/github/sync-all` - Trigger full sync background job
 
+### SignalR Hubs (NEW - Sprint 3!) 🔔
+
+| File | Endpoint | Description |
+|------|----------|-------------|
+| `Hubs/MetricsHub.cs` | `/hubs/metrics` | Real-time dashboard updates |
+
+**Hub Methods:**
+- `JoinDashboard(userId)` - Subscribe to user updates
+- `LeaveDashboard(userId)` - Unsubscribe from updates
+
+**Events Sent:**
+- `SyncStarted` - When data sync begins
+- `SyncCompleted` - When data sync completes (includes stats)
+- `MetricsUpdated` - When metrics are recalculated
+
 ### Blazor Pages
 
 | File | Route | Purpose | Status |
 |------|-------|---------|--------|
-| `Components/Pages/Home.razor` | `/` | Dashboard with charts and GitHub connection | ✅ Working (Charts added!) |
+| `Components/Pages/Home.razor` | `/` | Dashboard with charts, heatmap, leaderboard, and real-time updates | ✅ Working |
 | `Components/Pages/Login.razor` | `/login` | User login | ✅ Working |
 | `Components/Pages/Register.razor` | `/register` | User registration | ✅ Working |
 | `Components/Pages/Repositories.razor` | `/repositories` | Display synced GitHub repos (36+ repos) | ✅ Working |
@@ -219,21 +253,25 @@ DevMetricsPRO/
 | `Components/Shared/DataPanel.razor` | Generic panel container with header | ✅ Working |
 | `Components/Shared/DataTable.razor` | Generic table component with templates | ✅ Working |
 | `Components/Shared/StatusBadge.razor` | Colored status indicators | ✅ Working |
+| `Components/Shared/Leaderboard.razor` | **✅ NEW!** Team leaderboard with rankings | ✅ Working |
+| `Components/Shared/Leaderboard.razor.css` | Scoped CSS for leaderboard | ✅ Working |
 
-### Chart Components (NEW - Sprint 3!) 📊
+### Chart Components (Sprint 3!) 📊
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `Components/Shared/Charts/LineChart.razor` | **✅ NEW!** Reusable line chart (Chart.js) | ✅ Working |
+| `Components/Shared/Charts/LineChart.razor` | Reusable line chart (Chart.js) | ✅ Working |
 | `Components/Shared/Charts/LineChart.razor.css` | Scoped CSS for line chart | ✅ Working |
-| `Components/Shared/Charts/BarChart.razor` | **✅ NEW!** Reusable bar chart (Chart.js) | ✅ Working |
+| `Components/Shared/Charts/BarChart.razor` | Reusable bar chart (Chart.js) | ✅ Working |
 | `Components/Shared/Charts/BarChart.razor.css` | Scoped CSS for bar chart | ✅ Working |
+| `Components/Shared/Charts/ContributionHeatmap.razor` | **✅ NEW!** GitHub-style heatmap | ✅ Working |
+| `Components/Shared/Charts/ContributionHeatmap.razor.css` | Scoped CSS for heatmap | ✅ Working |
 
-### JavaScript Files (NEW - Sprint 3!) 📊
+### JavaScript Files (Sprint 3!) 📊
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `wwwroot/js/charts.js` | **✅ NEW!** Chart.js JSInterop wrapper | ✅ Working |
+| `wwwroot/js/charts.js` | Chart.js JSInterop wrapper | ✅ Working |
 
 **Chart.js Functions:**
 - `chartHelpers.createLineChart(canvasId, config)` - Create line chart
@@ -259,7 +297,9 @@ DevMetricsPRO/
 
 | File | Purpose |
 |------|---------|
-| `Services/AuthStateService.cs` | Manages JWT token in localStorage, checks authentication state |
+| `Services/AuthStateService.cs` | Manages JWT token in localStorage, checks authentication state, gets user ID |
+| `Services/MetricsHubService.cs` | **✅ NEW!** Sends SignalR notifications to clients |
+| `Services/SignalRService.cs` | **✅ NEW!** Client-side SignalR connection management |
 
 ### Background Jobs
 
@@ -273,6 +313,7 @@ DevMetricsPRO/
 - Syncs pull requests for each repository (incremental)
 - Auto-creates Developer entities for contributors
 - Uses `LastSyncedAt` for efficient incremental syncs
+- **Sends SignalR notifications** on sync start/complete
 - Triggered via: `POST /api/github/sync-all` endpoint
 - Managed by Hangfire (dashboard at `/hangfire`)
 
@@ -312,24 +353,24 @@ DevMetricsPRO/
 - [x] Phase 2.7: Basic metrics calculation ✅
 - [x] UI Redesign: Professional design system ✅
 
-### 🏃 In Progress (Sprint 3 - Charts & Real-time)
+### ✅ Completed (Sprint 3 - Charts & Real-time) ~80% Done!
 
 - [x] Phase 3.1: Chart Library Setup ✅ (Chart.js via JSInterop)
 - [x] Phase 3.2: Commit Activity Chart ✅ (Line chart with real data!)
 - [x] Phase 3.3: PR Statistics Bar Chart ✅ (Bar chart with status breakdown)
-- [ ] Phase 3.4: Contribution Heatmap (NEXT!)
-- [ ] Phase 3.5: Team Leaderboard
-- [ ] Phase 3.6-3.7: SignalR Real-time Updates
-- [ ] Phase 3.8-3.10: Advanced Features & Polish
+- [x] Phase 3.4: Contribution Heatmap ✅ (GitHub-style calendar!)
+- [x] Phase 3.5: Team Leaderboard ✅ (Sortable with metrics!)
+- [x] Phase 3.6: SignalR Hub Setup ✅ (Real-time notifications!)
+- [x] Phase 3.7: Client-Side SignalR ✅ (Auto-refresh dashboard!)
+- [x] Phase 3.8: Advanced Metrics ✅ (PR review time, code velocity!)
+- [ ] Phase 3.9: Time Range Filters (NEXT!)
+- [ ] Phase 3.10: Polish & Performance
 
 ### ⏭️ Not Started
 
 - Developers page (`/developers`)
 - Metrics page (`/metrics`)
 - Settings page (`/settings`)
-- Contribution Heatmap component
-- SignalR real-time updates
-- Advanced analytics
 
 ---
 
@@ -343,20 +384,31 @@ DevMetricsPRO/
 - ✅ `GitHubPullRequestDto` - Use for PR data
 - ✅ `CommitActivityChartDto` - Use for commit charts
 - ✅ `PullRequestChartDto` - Use for PR charts
+- ✅ `ContributionHeatmapDto` - Use for heatmap
+- ✅ `LeaderboardEntryDto` - Use for leaderboard
+- ✅ `ReviewTimeMetricsDto` - Use for PR review metrics
+- ✅ `CodeVelocityDto` - Use for velocity metrics
+- ✅ `SyncResultDto` - Use for sync notifications
 - ✅ `LoginRequest`, `RegisterRequest`, `AuthResponse` - Use for auth
 
 **Services:**
 - ✅ `IChartDataService` - Use for chart data aggregation
+- ✅ `ILeaderboardService` - Use for leaderboard data
+- ✅ `IMetricsCalculationService` - Use for all metrics
+- ✅ `IMetricsHubService` - Use for SignalR notifications
 - ✅ `IGitHubRepositoryService` - Use for fetching repos
 - ✅ `IGitHubCommitsService` - Use for fetching commits
 - ✅ `IGitHubPullRequestService` - Use for fetching PRs
 - ✅ `IGitHubOAuthService` - Use for OAuth flow
 - ✅ `IJwtService` - Use for JWT tokens
 - ✅ `AuthStateService` - Use for client-side auth state
+- ✅ `SignalRService` - Use for client-side SignalR
 
 **Components:**
 - ✅ `LineChart.razor` - Use for line charts
 - ✅ `BarChart.razor` - Use for bar charts
+- ✅ `ContributionHeatmap.razor` - Use for heatmaps
+- ✅ `Leaderboard.razor` - Use for leaderboards
 - ✅ `MetricCard.razor` - Use for metric display
 - ✅ `DataPanel.razor` - Use for panel containers
 - ✅ `DataTable.razor` - Use for tables
@@ -367,12 +419,10 @@ DevMetricsPRO/
 ### ✅ OK TO CREATE:
 
 **Components (not yet implemented):**
-- `ContributionHeatmap.razor` - For Phase 3.4
-- `Leaderboard.razor` - For Phase 3.5
+- `TimeRangeSelector.razor` - For Phase 3.9
 
-**DTOs (not yet implemented):**
-- `ContributionHeatmapDto` - For Phase 3.4
-- `LeaderboardEntryDto` - For Phase 3.5
+**Services (not yet implemented):**
+- `DashboardStateService.cs` - For Phase 3.9
 
 **Pages (not yet implemented):**
 - `Developers.razor` - Display developers list
@@ -403,6 +453,8 @@ ls src/DevMetricsPro.Web/Components/Pages/
 ls src/DevMetricsPro.Web/Components/Shared/
 ls src/DevMetricsPro.Web/Components/Shared/Charts/
 ls src/DevMetricsPro.Web/Controllers/
+ls src/DevMetricsPro.Web/Hubs/
+ls src/DevMetricsPro.Web/Services/
 ```
 
 ---
@@ -427,89 +479,13 @@ Web (depends on Infrastructure + Application + Core)
 | **Core** | Entities, Enums, Interfaces | Business logic, data access, external services |
 | **Application** | DTOs, Service Interfaces, Business Logic | Data access implementation, external API calls |
 | **Infrastructure** | DbContext, Repositories, Service Implementations | UI components, controllers |
-| **Web** | Blazor Components, Controllers, UI Services | Business logic, direct database access |
+| **Web** | Blazor Components, Controllers, UI Services, Hubs | Business logic, direct database access |
 
 ---
 
-## 💡 Common Patterns
-
-### Chart Component Pattern (NEW!)
-```razor
-@implements IAsyncDisposable
-@inject IJSRuntime JS
-
-<div class="chart-container">
-    <canvas id="@CanvasId"></canvas>
-</div>
-
-@code {
-    [Parameter, EditorRequired]
-    public required List<string> Labels { get; set; }
-
-    [Parameter, EditorRequired]
-    public required List<int> Data { get; set; }
-
-    private string CanvasId => $"chart-{Guid.NewGuid():N}"[..12];
-    private bool _chartCreated = false;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await JS.InvokeVoidAsync("chartHelpers.createLineChart", CanvasId, config);
-            _chartCreated = true;
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_chartCreated)
-            await JS.InvokeVoidAsync("chartHelpers.destroyChart", CanvasId);
-    }
-}
-```
-
-### Chart Data Service Pattern
-```csharp
-public class ChartDataService : IChartDataService
-{
-    private readonly IUnitOfWork _unitOfWork;
-
-    public async Task<CommitActivityChartDto> GetCommitActivityAsync(
-        Guid? developerId,
-        DateTime startDate,
-        DateTime endDate,
-        CancellationToken cancellationToken = default)
-    {
-        var commits = await _unitOfWork.Repository<Commit>()
-            .Query()
-            .AsNoTracking()
-            .Where(c => c.CommittedAt >= startDate && c.CommittedAt <= endDate)
-            .GroupBy(c => c.CommittedAt.Date)
-            .Select(g => new { Date = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-        
-        // Transform and return DTO...
-    }
-}
-```
-
----
-
-## 📞 Questions to Ask Before Creating New Files
-
-1. **DTOs**: Does Application layer have this DTO already?
-2. **Services**: Does an interface exist in Application/Interfaces?
-3. **Components**: Does a similar component exist in Shared/Charts?
-4. **Pages**: Check routes - is the page already defined?
-5. **Entities**: All 7 core entities exist - do I need a new one?
-6. **Controllers**: Does a controller for this resource exist?
-
----
-
-**Last Updated**: November 27, 2025 (Post Phase 3.3)  
+**Last Updated**: December 2, 2025 (Post Phase 3.8)  
 **Current Sprint**: Sprint 3 - Charts & Real-time Dashboard  
-**Current Phase**: Phase 3.4 - Contribution Heatmap (Next)  
-**Progress**: 3/10 phases done (30%)  
+**Current Phase**: Phase 3.9 - Time Range Filters (Next)  
+**Progress**: 8/10 phases done (80%)  
 **Next Review**: After Sprint 3 completion
 
