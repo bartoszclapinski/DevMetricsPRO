@@ -99,6 +99,29 @@ public class AuthStateService
             return null;
         }
     }
+
+    /// <summary>
+    /// Get the user ID from the JWT token
+    /// </summary>
+    /// <returns>The user ID or null if not found</returns>
+    public async Task<string?> GetUserIdAsync()
+    {
+        var token = await GetTokenAsync();
+        if (string.IsNullOrEmpty(token)) return null;
+
+        try
+        {
+            var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            // Try standard claims first, then JWT-specific ones
+            return jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
+                ?? jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
+                ?? jwtToken.Claims.FirstOrDefault(c => c.Type == "userId")?.Value;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 public class UserInfo

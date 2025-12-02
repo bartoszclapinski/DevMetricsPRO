@@ -6,15 +6,37 @@
 @using DevMetricsPro.Web.Components.Shared
 @using DevMetricsPro.Web.Components.Shared.Charts
 @using DevMetricsPro.Web.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
 @inject AuthStateService AuthState
 @inject IChartDataService ChartDataService
 @inject ILeaderboardService LeaderboardService
+@inject SignalRService SignalR
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
 @inject ISnackbar Snackbar
 
 <PageTitle>Dashboard - DevMetrics Pro</PageTitle>
+
+<!-- Sync Status Indicator -->
+@if (_isSyncing)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.Sync">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            <span>Syncing data from GitHub... Dashboard will update automatically.</span>
+        </div>
+    </MudAlert>
+}
+
+<!-- Connection Status (only show when disconnected) -->
+@if (_isAuthenticated && !_isSignalRConnected && _signalRConnectionAttempted)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" Icon="@Icons.Material.Filled.CloudOff">
+        <span>Real-time updates unavailable. Data will still refresh on page reload.</span>
+    </MudAlert>
+}
 
 @if (!_isAuthenticated)
 {
@@ -380,18 +402,31 @@ else
     private List<LeaderboardEntryDto>? _leaderboardEntries;
     private bool _isLoadingLeaderboard = false;
     private LeaderboardMetric _selectedMetric = LeaderboardMetric.Commits;
+
+    // SignalR state - Phase 3.7
+    private bool _isSyncing = false;
+    private bool _isSignalRConnected = false;
+    private bool _signalRConnectionAttempted = false;
+    private string? _currentUserId;
+
     protected override async Task OnInitializedAsync()
     {
         _isAuthenticated = await AuthState.IsAuthenticatedAsync();
         
         if (_isAuthenticated)
         {
+            // Get user ID for SignalR
+            _currentUserId = await AuthState.GetUserIdAsync();
+            
             await CheckGitHubConnectionStatus();
             await LoadRecentCommitsAsync();
             await LoadCommitActivityAsync(7);
             await LoadPRStatsAsync(30);
             await LoadHeatmapAsync(52);
             await LoadLeaderboardAsync(_selectedMetric);
+
+            // Initialize SignalR connection
+            await InitializeSignalRAsync();
         }
         
         // Check if we were redirected back from GitHub OAuth
@@ -402,6 +437,117 @@ else
             githubConnectedMessage = "GitHub account connected successfully!";
             await CheckGitHubConnectionStatus(); // Refresh status
         }
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        if (string.IsNullOrEmpty(_currentUserId))
+            return;
+
+        try
+        {
+            // Register event handlers
+            SignalR.OnSyncStarted += HandleSyncStarted;
+            SignalR.OnSyncCompleted += HandleSyncCompleted;
+            SignalR.OnMetricsUpdated += HandleMetricsUpdated;
+            SignalR.OnConnectionStateChanged += HandleConnectionStateChanged;
+
+            // Start connection
+            await SignalR.StartAsync(_currentUserId);
+            _isSignalRConnected = true;
+            _signalRConnectionAttempted = true;
+
+            Logger.LogInformation("SignalR connected for dashboard updates");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize SignalR connection");
+            _isSignalRConnected = false;
+            _signalRConnectionAttempted = true;
+            // Don't show error - dashboard still works without real-time updates
+        }
+    }
+
+    private async Task HandleSyncStarted()
+    {
+        await InvokeAsync(() =>
+        {
+            _isSyncing = true;
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandleSyncCompleted(SyncResultDto result)
+    {
+        await InvokeAsync(async () =>
+        {
+            _isSyncing = false;
+
+            if (result.Success)
+            {
+                // Show success notification
+                Snackbar.Add(
+                    $"Sync complete! {result.RepositoriesSynced} repos, {result.CommitsSynced} commits, {result.PullRequestsSynced} PRs",
+                    Severity.Success,
+                    config => config.Icon = Icons.Material.Filled.CheckCircle);
+
+                // Refresh all dashboard data
+                await RefreshAllDataAsync();
+            }
+            else
+            {
+                Snackbar.Add(
+                    $"Sync failed: {result.ErrorMessage ?? "Unknown error"}",
+                    Severity.Error,
+                    config => config.Icon = Icons.Material.Filled.Error);
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandleMetricsUpdated()
+    {
+        await InvokeAsync(async () =>
+        {
+            Snackbar.Add("Metrics updated!", Severity.Info, config => config.Icon = Icons.Material.Filled.Refresh);
+            await RefreshAllDataAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void HandleConnectionStateChanged(HubConnectionState state)
+    {
+        InvokeAsync(() =>
+        {
+            _isSignalRConnected = state == HubConnectionState.Connected;
+            
+            if (state == HubConnectionState.Reconnecting)
+            {
+                Snackbar.Add("Connection lost. Reconnecting...", Severity.Warning);
+            }
+            else if (state == HubConnectionState.Connected && _signalRConnectionAttempted)
+            {
+                Snackbar.Add("Reconnected!", Severity.Success);
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAllDataAsync()
+    {
+        // Reload all data in parallel for efficiency
+        var tasks = new List<Task>
+        {
+            LoadRecentCommitsAsync(),
+            LoadCommitActivityAsync(_selectedDays),
+            LoadPRStatsAsync(_selectedPRDays),
+            LoadHeatmapAsync(_selectedWeeks),
+            LoadLeaderboardAsync(_selectedMetric)
+        };
+
+        await Task.WhenAll(tasks);
     }
 
     private async Task CheckGitHubConnectionStatus()
@@ -678,5 +824,28 @@ else
         public string RepositoryName { get; set; } = string.Empty;
         public int LinesAdded { get; set; }
         public int LinesRemoved { get; set; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Unregister event handlers
+        SignalR.OnSyncStarted -= HandleSyncStarted;
+        SignalR.OnSyncCompleted -= HandleSyncCompleted;
+        SignalR.OnMetricsUpdated -= HandleMetricsUpdated;
+        SignalR.OnConnectionStateChanged -= HandleConnectionStateChanged;
+
+        // Note: Don't dispose SignalR service here as it's managed by DI
+        // Just leave the dashboard group
+        if (!string.IsNullOrEmpty(_currentUserId))
+        {
+            try
+            {
+                await SignalR.LeaveDashboardAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Error leaving dashboard group during dispose");
+            }
+        }
     }
 }

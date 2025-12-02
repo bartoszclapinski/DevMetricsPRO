@@ -170,6 +170,7 @@ try
     // SignalR for real-time updates
     builder.Services.AddSignalR();
     builder.Services.AddScoped<IMetricsHubService, MetricsHubService>();
+    builder.Services.AddScoped<SignalRService>();
 
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
