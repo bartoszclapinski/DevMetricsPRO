@@ -9,11 +9,13 @@
 @using DevMetricsPro.Web.Services
 @using Microsoft.AspNetCore.SignalR.Client
 @implements IAsyncDisposable
+@implements IDisposable
 @inject AuthStateService AuthState
 @inject IChartDataService ChartDataService
 @inject ILeaderboardService LeaderboardService
 @inject IMetricsCalculationService MetricsService
 @inject SignalRService SignalR
+@inject DashboardStateService DashboardState
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
@@ -54,6 +56,17 @@
 }
 else
 {
+    <!-- Global Time Range Selector - Phase 3.9 -->
+    <MudPaper Class="pa-3 mb-4" Elevation="1">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-2" />
+                Dashboard Filter
+            </MudText>
+            <TimeRangeSelector />
+        </div>
+    </MudPaper>
+
     <!-- Metrics Grid -->
     <div class="metrics-grid">
         <MetricCard 
@@ -85,31 +98,6 @@ else
     <MudPaper Class="pa-4 mt-4">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <MudText Typo="Typo.h5">📈 Commit Activity</MudText>
-            
-            <!-- Time Range Selector -->
-            <div style="display: flex; gap: 8px;">
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedDays == 7 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadCommitActivityAsync(7)">
-                    7 Days
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedDays == 30 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadCommitActivityAsync(30)">
-                    30 Days
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedDays == 90 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadCommitActivityAsync(90)">
-                    90 Days
-                </MudButton>
-            </div>
         </div>
 
         @if (_isLoadingChart)
@@ -158,31 +146,6 @@ else
     <MudPaper Class="pa-4 mt-4">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <MudText Typo="Typo.h5">🔀 Pull Request Statistics</MudText>
-            
-            <!-- Time Range Selector -->
-            <div style="display: flex; gap: 8px;">
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedPRDays == 7 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadPRStatsAsync(7)">
-                    7 Days
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedPRDays == 30 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadPRStatsAsync(30)">
-                    30 Days
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedPRDays == 90 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadPRStatsAsync(90)">
-                    90 Days
-                </MudButton>
-            </div>
         </div>
 
         @if (_isLoadingPRChart)
@@ -244,31 +207,6 @@ else
     <MudPaper Class="pa-4 mt-4">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <MudText Typo="Typo.h5">🗓️ Contribution Activity</MudText>
-            
-            <!-- Week Range Selector -->
-            <div style="display: flex; gap: 8px;">
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedWeeks == 13 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadHeatmapAsync(13)">
-                    3 Months
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedWeeks == 26 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadHeatmapAsync(26)">
-                    6 Months
-                </MudButton>
-                <MudButton 
-                    Size="Size.Small" 
-                    Variant="@(_selectedWeeks == 52 ? Variant.Filled : Variant.Outlined)"
-                    Color="Color.Primary"
-                    OnClick="() => LoadHeatmapAsync(52)">
-                    1 Year
-                </MudButton>
-            </div>
         </div>
 
         <ContributionHeatmap 
@@ -279,7 +217,7 @@ else
 
     <!-- Team Leaderboard - Phase 3.5 -->
     <MudPaper Class="pa-4 mt-4">
-        <MudText Typo="Typo.h5" Class="mb-4">🏆 Top Contributors (Last 30 Days)</MudText>
+        <MudText Typo="Typo.h5" Class="mb-4">🏆 Top Contributors (@DashboardState.GetRangeLabel())</MudText>
         
         <Leaderboard 
             Entries="@_leaderboardEntries"
@@ -471,17 +409,14 @@ else
     // Chart data - Phase 3.2
     private CommitActivityChartDto? _chartData;
     private bool _isLoadingChart = false;
-    private int _selectedDays = 7;
 
     // PR Chart data - Phase 3.3
     private PullRequestChartDto? _prChartData;
     private bool _isLoadingPRChart = false;
-    private int _selectedPRDays = 30;
 
     // Heatmap data - Phase 3.4
     private ContributionHeatmapDto? _heatmapData;
     private bool _isLoadingHeatmap = false;
-    private int _selectedWeeks = 52;
 
     // Leaderboard data - Phase 3.5
     private List<LeaderboardEntryDto>? _leaderboardEntries;
@@ -509,13 +444,14 @@ else
             // Get user ID for SignalR
             _currentUserId = await AuthState.GetUserIdAsync();
             
+            // Subscribe to global time range changes - Phase 3.9
+            DashboardState.OnStateChanged += HandleTimeRangeChanged;
+            
             await CheckGitHubConnectionStatus();
             await LoadRecentCommitsAsync();
-            await LoadCommitActivityAsync(7);
-            await LoadPRStatsAsync(30);
-            await LoadHeatmapAsync(52);
-            await LoadLeaderboardAsync(_selectedMetric);
-            await LoadAdvancedMetricsAsync();
+            
+            // Load all charts using global time range
+            await LoadAllChartsAsync();
 
             // Initialize SignalR connection
             await InitializeSignalRAsync();
@@ -529,6 +465,39 @@ else
             githubConnectedMessage = "GitHub account connected successfully!";
             await CheckGitHubConnectionStatus(); // Refresh status
         }
+    }
+
+    /// <summary>
+    /// Handler for global time range changes - Phase 3.9
+    /// </summary>
+    private async void HandleTimeRangeChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            Logger.LogInformation("Time range changed to: {Start} - {End}", 
+                DashboardState.StartDate, DashboardState.EndDate);
+            
+            // Reload all charts with new time range
+            await LoadAllChartsAsync();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Loads all chart data using the global time range
+    /// </summary>
+    private async Task LoadAllChartsAsync()
+    {
+        var tasks = new List<Task>
+        {
+            LoadCommitActivityAsync(),
+            LoadPRStatsAsync(),
+            LoadHeatmapAsync(),
+            LoadLeaderboardAsync(_selectedMetric),
+            LoadAdvancedMetricsAsync()
+        };
+
+        await Task.WhenAll(tasks);
     }
 
     private async Task InitializeSignalRAsync()
@@ -633,11 +602,7 @@ else
         var tasks = new List<Task>
         {
             LoadRecentCommitsAsync(),
-            LoadCommitActivityAsync(_selectedDays),
-            LoadPRStatsAsync(_selectedPRDays),
-            LoadHeatmapAsync(_selectedWeeks),
-            LoadLeaderboardAsync(_selectedMetric),
-            LoadAdvancedMetricsAsync()
+            LoadAllChartsAsync()
         };
 
         await Task.WhenAll(tasks);
@@ -658,13 +623,11 @@ else
 
         try
         {
-            var endDate = DateTime.UtcNow;
-            var startDate = endDate.AddDays(-30);
-
+            // Use global time range from DashboardState - Phase 3.9
             _reviewMetrics = await MetricsService.GetReviewTimeMetricsAsync(
                 developerId: null, // All developers
-                startDate: startDate,
-                endDate: endDate,
+                startDate: DashboardState.StartDate,
+                endDate: DashboardState.EndDate,
                 cancellationToken: default);
         }
         catch (Exception ex)
@@ -685,9 +648,13 @@ else
 
         try
         {
+            // Calculate weeks from global time range - Phase 3.9
+            var days = DashboardState.GetDaysInRange();
+            var weeks = days == int.MaxValue ? 12 : Math.Max(1, days / 7);
+            
             _velocityMetrics = await MetricsService.GetCodeVelocityAsync(
                 developerId: null, // All developers
-                numberOfWeeks: 12,
+                numberOfWeeks: weeks,
                 cancellationToken: default);
         }
         catch (Exception ex)
@@ -855,21 +822,18 @@ else
         Snackbar.Add(message ?? fallbackMessage, severity);
     }
 
-    private async Task LoadCommitActivityAsync(int days)
+    private async Task LoadCommitActivityAsync()
     {
-        _selectedDays = days;
         _isLoadingChart = true;
         StateHasChanged();
 
         try
         {
-            var endDate = DateTime.UtcNow;
-            var startDate = endDate.AddDays(-days);
-
+            // Use global time range from DashboardState - Phase 3.9
             _chartData = await ChartDataService.GetCommitActivityAsync(
                 developerId: null, // null = all developers
-                startDate: startDate,
-                endDate: endDate,
+                startDate: DashboardState.StartDate,
+                endDate: DashboardState.EndDate,
                 cancellationToken: default);
         }
         catch (Exception ex)
@@ -884,14 +848,17 @@ else
         }
     }
 
-    private async Task LoadPRStatsAsync(int days)
+    private async Task LoadPRStatsAsync()
     {
-        _selectedPRDays = days;
         _isLoadingPRChart = true;
         StateHasChanged();
 
         try
         {
+            // Use global time range from DashboardState - Phase 3.9
+            var days = DashboardState.GetDaysInRange();
+            if (days == int.MaxValue) days = 365; // Cap at 1 year for "All Time"
+            
             _prChartData = await ChartDataService.GetPullRequestStatsAsync(
                 days: days,
                 cancellationToken: default);
@@ -908,14 +875,17 @@ else
         }
     }
 
-    private async Task LoadHeatmapAsync(int weeks)
+    private async Task LoadHeatmapAsync()
     {
-        _selectedWeeks = weeks;
         _isLoadingHeatmap = true;
         StateHasChanged();
 
         try
         {
+            // Calculate weeks from global time range - Phase 3.9
+            var days = DashboardState.GetDaysInRange();
+            var weeks = days == int.MaxValue ? 52 : Math.Max(1, days / 7);
+            
             _heatmapData = await ChartDataService.GetContributionHeatmapAsync(
                 numberOfWeeks: weeks,
                 cancellationToken: default);
@@ -940,14 +910,12 @@ else
 
         try
         {
-            var endDate = DateTime.UtcNow;
-            var startDate = endDate.AddDays(-30); // Last 30 days
-
+            // Use global time range from DashboardState - Phase 3.9
             _leaderboardEntries = await LeaderboardService.GetLeaderboardAsync(
                 metric: metric,
                 topN: 10,
-                startDate: startDate,
-                endDate: endDate,
+                startDate: DashboardState.StartDate,
+                endDate: DashboardState.EndDate,
                 cancellationToken: default);
         }
         catch (Exception ex)
@@ -1000,6 +968,12 @@ else
         public int LinesRemoved { get; set; }
     }
 
+    public void Dispose()
+    {
+        // Unsubscribe from dashboard state changes - Phase 3.9
+        DashboardState.OnStateChanged -= HandleTimeRangeChanged;
+    }
+
     public async ValueTask DisposeAsync()
     {
         // Unregister event handlers
@@ -1007,6 +981,9 @@ else
         SignalR.OnSyncCompleted -= HandleSyncCompleted;
         SignalR.OnMetricsUpdated -= HandleMetricsUpdated;
         SignalR.OnConnectionStateChanged -= HandleConnectionStateChanged;
+        
+        // Unsubscribe from dashboard state - Phase 3.9
+        DashboardState.OnStateChanged -= HandleTimeRangeChanged;
 
         // Note: Don't dispose SignalR service here as it's managed by DI
         // Just leave the dashboard group

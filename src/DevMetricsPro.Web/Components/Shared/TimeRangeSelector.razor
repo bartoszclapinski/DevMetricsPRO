@@ -1,0 +1,102 @@
+@using DevMetricsPro.Web.Services
+@inject DashboardStateService DashboardState
+@implements IDisposable
+
+<div class="time-range-selector">
+    <div class="preset-buttons">
+        <button class="preset-btn @GetActiveClass(TimeRangePreset.Last7Days)" 
+                @onclick="() => SelectPreset(TimeRangePreset.Last7Days)">
+            7D
+        </button>
+        <button class="preset-btn @GetActiveClass(TimeRangePreset.Last30Days)" 
+                @onclick="() => SelectPreset(TimeRangePreset.Last30Days)">
+            30D
+        </button>
+        <button class="preset-btn @GetActiveClass(TimeRangePreset.Last90Days)" 
+                @onclick="() => SelectPreset(TimeRangePreset.Last90Days)">
+            90D
+        </button>
+        <button class="preset-btn @GetActiveClass(TimeRangePreset.Last365Days)" 
+                @onclick="() => SelectPreset(TimeRangePreset.Last365Days)">
+            1Y
+        </button>
+        <button class="preset-btn @GetActiveClass(TimeRangePreset.AllTime)" 
+                @onclick="() => SelectPreset(TimeRangePreset.AllTime)">
+            All
+        </button>
+    </div>
+    
+    @if (ShowCustomPicker)
+    {
+        <div class="custom-picker">
+            <MudDateRangePicker 
+                Label="Custom Range"
+                DateRange="_dateRange"
+                DateRangeChanged="OnCustomRangeChanged"
+                Variant="Variant.Outlined"
+                Margin="Margin.Dense"
+                Class="custom-date-picker" />
+        </div>
+    }
+    
+    <div class="range-label">
+        <MudIcon Icon="@Icons.Material.Filled.DateRange" Size="Size.Small" />
+        <span>@DashboardState.GetRangeLabel()</span>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Whether to show the custom date range picker
+    /// </summary>
+    [Parameter]
+    public bool ShowCustomPicker { get; set; } = false;
+
+    /// <summary>
+    /// Callback when time range changes (optional - state service handles most cases)
+    /// </summary>
+    [Parameter]
+    public EventCallback OnRangeChanged { get; set; }
+
+    private DateRange? _dateRange;
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to state changes to update UI
+        DashboardState.OnStateChanged += HandleStateChanged;
+        
+        // Initialize date range picker with current values
+        _dateRange = new DateRange(DashboardState.StartDate, DashboardState.EndDate);
+    }
+
+    private void SelectPreset(TimeRangePreset preset)
+    {
+        DashboardState.SetTimeRange(preset);
+        _dateRange = new DateRange(DashboardState.StartDate, DashboardState.EndDate);
+    }
+
+    private async Task OnCustomRangeChanged(DateRange? range)
+    {
+        if (range?.Start.HasValue == true && range?.End.HasValue == true)
+        {
+            DashboardState.SetCustomRange(range.Start.Value, range.End.Value);
+            await OnRangeChanged.InvokeAsync();
+        }
+    }
+
+    private string GetActiveClass(TimeRangePreset preset)
+    {
+        return DashboardState.SelectedPreset == preset ? "active" : "";
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        DashboardState.OnStateChanged -= HandleStateChanged;
+    }
+}
+
