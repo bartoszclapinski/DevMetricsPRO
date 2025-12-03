@@ -172,6 +172,9 @@ try
     builder.Services.AddScoped<IMetricsHubService, MetricsHubService>();
     builder.Services.AddScoped<SignalRService>();
 
+    // Dashboard state management (global time range filter)
+    builder.Services.AddScoped<DashboardStateService>();
+
     // Configure application cookie
     builder.Services.ConfigureApplicationCookie(options =>
     {

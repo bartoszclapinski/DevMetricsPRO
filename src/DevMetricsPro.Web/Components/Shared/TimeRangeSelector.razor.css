@@ -1,0 +1,93 @@
+.time-range-selector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--mud-palette-background-grey, #f5f5f5);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.preset-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--mud-palette-text-secondary, #666);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 48px;
+}
+
+.preset-btn:hover {
+    background: var(--mud-palette-action-default-hover, rgba(0,0,0,0.04));
+    color: var(--mud-palette-text-primary, #333);
+}
+
+.preset-btn.active {
+    background: var(--mud-palette-primary, #594ae2);
+    color: white;
+    box-shadow: 0 2px 4px rgba(89, 74, 226, 0.3);
+}
+
+.preset-btn.active:hover {
+    background: var(--mud-palette-primary-darken, #4a3bc7);
+    color: white;
+}
+
+.custom-picker {
+    min-width: 200px;
+}
+
+::deep .custom-date-picker {
+    margin: 0;
+}
+
+::deep .custom-date-picker .mud-input-slot {
+    font-size: 0.875rem;
+}
+
+.range-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--mud-palette-text-secondary, #666);
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--mud-palette-surface, #fff);
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-lines-default, #e0e0e0);
+}
+
+.range-label span {
+    white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .time-range-selector {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .preset-buttons {
+        justify-content: center;
+    }
+    
+    .preset-btn {
+        padding: 0.5rem 0.75rem;
+        min-width: 40px;
+    }
+    
+    .range-label {
+        justify-content: center;
+    }
+}
+
