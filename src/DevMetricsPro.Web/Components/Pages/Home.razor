@@ -102,10 +102,7 @@ else
 
         @if (_isLoadingChart)
         {
-            <div style="text-align: center; padding: 60px;">
-                <MudProgressCircular Indeterminate="true" />
-                <MudText Class="mt-2">Loading chart data...</MudText>
-            </div>
+            <SkeletonChart ChartType="SkeletonChartType.Line" ShowLegend="true" />
         }
         else if (_chartData != null && _chartData.TotalCommits > 0)
         {
@@ -134,11 +131,10 @@ else
         }
         else
         {
-            <div style="text-align: center; padding: 60px; color: var(--mud-palette-text-secondary);">
-                <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
-                <MudText Typo="Typo.h6">No commit data available</MudText>
-                <MudText Typo="Typo.body2">Connect GitHub and sync your repositories to see commit activity</MudText>
-            </div>
+            <EmptyState 
+                Emoji="📊"
+                Title="No commit data available"
+                Message="Connect GitHub and sync your repositories to see commit activity" />
         }
     </MudPaper>
 
@@ -150,10 +146,7 @@ else
 
         @if (_isLoadingPRChart)
         {
-            <div style="text-align: center; padding: 60px;">
-                <MudProgressCircular Indeterminate="true" />
-                <MudText Class="mt-2">Loading PR statistics...</MudText>
-            </div>
+            <SkeletonChart ChartType="SkeletonChartType.Bar" ShowLegend="false" />
         }
         else if (_prChartData != null && _prChartData.TotalPRs > 0)
         {
@@ -195,11 +188,10 @@ else
         }
         else
         {
-            <div style="text-align: center; padding: 60px; color: var(--mud-palette-text-secondary);">
-                <div style="font-size: 48px; margin-bottom: 16px;">🔀</div>
-                <MudText Typo="Typo.h6">No pull request data available</MudText>
-                <MudText Typo="Typo.body2">Connect GitHub and sync your repositories to see PR statistics</MudText>
-            </div>
+            <EmptyState 
+                Emoji="🔀"
+                Title="No pull request data available"
+                Message="Connect GitHub and sync your repositories to see PR statistics" />
         }
     </MudPaper>
 

@@ -1,0 +1,58 @@
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    min-height: 200px;
+}
+
+.empty-icon {
+    margin-bottom: 16px;
+    opacity: 0.6;
+}
+
+.empty-icon ::deep .mud-icon-root {
+    font-size: 64px !important;
+    color: var(--mud-palette-text-disabled);
+}
+
+.empty-emoji {
+    font-size: 64px;
+    line-height: 1;
+    display: block;
+}
+
+.empty-content {
+    max-width: 400px;
+}
+
+.empty-title {
+    color: var(--mud-palette-text-primary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.empty-message {
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.5;
+}
+
+.empty-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Subtle animation */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.empty-state:hover .empty-icon {
+    animation: float 2s ease-in-out infinite;
+}
+

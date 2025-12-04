@@ -493,3 +493,142 @@ body {
     }
 }
 
+/* === DASHBOARD RESPONSIVE STYLES - Phase 3.10 === */
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    min-height: 250px;
+    width: 100%;
+}
+
+/* Responsive chart adjustments */
+@media (max-width: 768px) {
+    .chart-container {
+        min-height: 200px;
+    }
+    
+    /* Stack charts vertically */
+    .mud-paper {
+        margin-bottom: var(--spacing-md) !important;
+    }
+    
+    /* Reduce padding on mobile */
+    .dashboard-container {
+        padding: var(--spacing-sm);
+    }
+    
+    /* Time range selector responsive */
+    .time-range-selector {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .preset-buttons {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        min-height: 180px;
+    }
+    
+    /* Smaller text on mobile */
+    .metric-value {
+        font-size: 20px;
+    }
+    
+    .panel-title {
+        font-size: 12px;
+    }
+}
+
+/* === TOUCH-FRIENDLY CONTROLS === */
+
+@media (hover: none) and (pointer: coarse) {
+    /* Touch devices */
+    .preset-btn,
+    .panel-action,
+    .control-select {
+        min-height: 44px; /* iOS touch target minimum */
+        min-width: 44px;
+    }
+    
+    .data-table td,
+    .data-table th {
+        padding: var(--spacing-md);
+    }
+}
+
+/* === ACCESSIBILITY ENHANCEMENTS === */
+
+/* Focus indicators */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
+}
+
+/* Skip link */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--info);
+    color: white;
+    padding: var(--spacing-sm) var(--spacing-md);
+    z-index: 10000;
+    transition: top 0.2s;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --border-color: #000;
+        --text-secondary: #333;
+        --text-tertiary: #444;
+    }
+    
+    .metric-card,
+    .panel {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* === PRINT STYLES === */
+
+@media print {
+    .top-nav,
+    .control-panel,
+    .nav-actions,
+    .panel-actions {
+        display: none !important;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .chart-container {
+        page-break-inside: avoid;
+    }
+}
+
