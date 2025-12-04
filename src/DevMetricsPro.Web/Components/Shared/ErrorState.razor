@@ -1,0 +1,99 @@
+@* Error state component with retry functionality *@
+
+<div class="error-state @Class">
+    <div class="error-icon">
+        @if (Icon != null)
+        {
+            <MudIcon Icon="@Icon" Size="Size.Large" Color="Color.Error" />
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Large" Color="Color.Error" />
+        }
+    </div>
+    
+    <div class="error-content">
+        <MudText Typo="Typo.h6" Class="error-title">
+            @(Title ?? "Something went wrong")
+        </MudText>
+        
+        <MudText Typo="Typo.body2" Class="error-message">
+            @(Message ?? "We couldn't load this data. Please try again.")
+        </MudText>
+    </div>
+    
+    @if (ShowRetry && OnRetry.HasDelegate)
+    {
+        <MudButton 
+            Variant="Variant.Filled" 
+            Color="Color.Primary"
+            StartIcon="@Icons.Material.Filled.Refresh"
+            OnClick="HandleRetry"
+            Disabled="_isRetrying"
+            Class="mt-3">
+            @if (_isRetrying)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Retrying...</span>
+            }
+            else
+            {
+                <span>@(RetryText ?? "Try Again")</span>
+            }
+        </MudButton>
+    }
+    
+    @if (ChildContent != null)
+    {
+        <div class="error-actions mt-3">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public bool ShowRetry { get; set; } = true;
+
+    [Parameter]
+    public string? RetryText { get; set; }
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string Class { get; set; } = string.Empty;
+
+    private bool _isRetrying = false;
+
+    private async Task HandleRetry()
+    {
+        if (!OnRetry.HasDelegate) return;
+
+        _isRetrying = true;
+        StateHasChanged();
+
+        try
+        {
+            await OnRetry.InvokeAsync();
+        }
+        finally
+        {
+            _isRetrying = false;
+            StateHasChanged();
+        }
+    }
+}
+

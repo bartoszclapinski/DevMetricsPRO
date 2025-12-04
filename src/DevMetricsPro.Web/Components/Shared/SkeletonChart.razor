@@ -1,0 +1,77 @@
+@* Skeleton loader for chart components with shimmer effect *@
+
+<div class="skeleton-chart @Class">
+    <div class="skeleton-header">
+        <div class="skeleton-title shimmer"></div>
+        <div class="skeleton-subtitle shimmer"></div>
+    </div>
+    
+    <div class="skeleton-chart-area">
+        @if (ChartType == SkeletonChartType.Line)
+        {
+            <!-- Line chart skeleton -->
+            <svg class="skeleton-line-chart" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <path class="skeleton-line shimmer-stroke" 
+                      d="M 0 150 Q 50 120 100 140 T 200 100 T 300 130 T 400 80" 
+                      fill="none" stroke-width="3"/>
+                <path class="skeleton-area" 
+                      d="M 0 150 Q 50 120 100 140 T 200 100 T 300 130 T 400 80 L 400 200 L 0 200 Z"/>
+            </svg>
+        }
+        else if (ChartType == SkeletonChartType.Bar)
+        {
+            <!-- Bar chart skeleton -->
+            <div class="skeleton-bars">
+                <div class="skeleton-bar shimmer" style="height: 60%;"></div>
+                <div class="skeleton-bar shimmer" style="height: 80%;"></div>
+                <div class="skeleton-bar shimmer" style="height: 45%;"></div>
+                <div class="skeleton-bar shimmer" style="height: 70%;"></div>
+                <div class="skeleton-bar shimmer" style="height: 55%;"></div>
+            </div>
+        }
+        else if (ChartType == SkeletonChartType.Heatmap)
+        {
+            <!-- Heatmap skeleton -->
+            <div class="skeleton-heatmap">
+                @for (int row = 0; row < 7; row++)
+                {
+                    <div class="skeleton-heatmap-row">
+                        @for (int col = 0; col < 12; col++)
+                        {
+                            <div class="skeleton-heatmap-cell shimmer"></div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- Generic skeleton -->
+            <div class="skeleton-generic shimmer"></div>
+        }
+    </div>
+    
+    @if (ShowLegend)
+    {
+        <div class="skeleton-legend">
+            <div class="skeleton-legend-item shimmer"></div>
+            <div class="skeleton-legend-item shimmer"></div>
+            <div class="skeleton-legend-item shimmer"></div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public SkeletonChartType ChartType { get; set; } = SkeletonChartType.Line;
+
+    [Parameter]
+    public bool ShowLegend { get; set; } = false;
+
+    [Parameter]
+    public string Class { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Height { get; set; } = "300px";
+}
+
